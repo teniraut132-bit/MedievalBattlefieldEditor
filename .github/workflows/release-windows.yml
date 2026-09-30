@@ -11,7 +11,7 @@ on:
       version:
         description: 'Release version, for example 5.0.0'
         required: true
-        default: '5.0.0'
+        default: '5.1.0'
 
 permissions:
   contents: write
@@ -37,6 +37,9 @@ jobs:
             Expand-Archive -Path 'Medieval_Battlefield_Editor_v5(2).zip' -DestinationPath 'source' -Force
             Copy-Item 'source/mb_editor_v4/*' 'editor' -Recurse -Force
           }
+
+      - name: Apply 5.1.0 editor patch
+        run: python tools/patch_5_1_0.py
 
       - name: Install dependencies
         run: |
