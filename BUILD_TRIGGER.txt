@@ -1,1 +1,2 @@
-Windows release build trigger.
+5.2.1 syntax repair rebuild trigger
+2
