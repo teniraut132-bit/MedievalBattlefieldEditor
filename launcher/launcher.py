@@ -90,8 +90,16 @@ def update():
 def threaded():threading.Thread(target=update,daemon=True).start()
 def launch():
     e=findexe(INSTALL)
-    if not e:messagebox.showinfo('Редактор','Редактор ещё не установлен. Нажмите «Проверить обновления».');return
-    subprocess.Popen([str(e)],cwd=str(INSTALL));root.destroy()
+    if not e:
+        threaded(); root.after(700, launch); return
+    try:
+        rel=next((r for r in get(api()) if not r.get('draft') and not r.get('prerelease')),None)
+        if rel and vt(rel['tag_name'].lstrip('vV'))>vt(ver()):
+            status.set('Сначала устанавливаю последнее обновление…'); threaded(); root.after(1200, launch); return
+    except Exception: pass
+    e=findexe(INSTALL)
+    if not e: messagebox.showerror('Редактор','Не удалось установить редактор.'); return
+    subprocess.Popen([str(e)],cwd=str(INSTALL)); root.destroy()
 def settings():
     w=tk.Toplevel(root);w.title('Настройки GitHub');w.geometry('520x330');vals={}
     for k,label in [('github_owner','GitHub owner'),('github_repo','Repository'),('asset_name','ZIP asset'),('news_file','Файл новостей'),('news_branch','Ветка новостей')]:
