@@ -23,7 +23,7 @@ def get_text(url):
     r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher'})
     with urllib.request.urlopen(r,timeout=20) as x:return x.read().decode('utf-8')
 def latest():
-    return json.loads(get_text(raw('latest.json')))
+    return json.loads(get_text(f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/latest.json"))
 def load_news():
     try:
         d=json.loads(get_text(f"https://raw.githubusercontent.com/{cfg['github_owner']}/{cfg['github_repo']}/{cfg.get('news_branch','main')}/{cfg.get('news_file','news.json')}"))
