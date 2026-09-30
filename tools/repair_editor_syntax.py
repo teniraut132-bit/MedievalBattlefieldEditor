@@ -3,16 +3,35 @@ from pathlib import Path
 p = Path("editor/Medieval_Battlefield_Editor_v4.py")
 s = p.read_text(encoding="utf-8")
 
-# A previous road-rendering patch could leave the first statement of
-# draw_obj() at column 0. Normalize that known malformed block.
-needle = "    def draw_obj(self,o):\nif o['kind']=='bridge':"
-fixed = "    def draw_obj(self,o):\n        if o['kind']=='bridge':"
-if needle in s:
-    s = s.replace(needle, fixed, 1)
+lines = s.splitlines(True)
+out = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+    if line.startswith("    def draw_obj(self,o):"):
+        out.append(line)
+        i += 1
+        block = []
+        while i < len(lines) and not (lines[i].startswith("    def ") or lines[i].startswith("    class ")):
+            block.append(lines[i])
+            i += 1
 
+        # The road patches accidentally de-indented the entire draw_obj body.
+        # If its first real statement is at method indentation, shift the
+        # whole body one level right; this preserves all relative nesting.
+        first = next((x for x in block if x.strip()), None)
+        if first is not None and len(first) - len(first.lstrip(" ")) <= 4:
+            block = [
+                ("    " + x if x.strip() else x)
+                for x in block
+            ]
+        out.extend(block)
+        continue
+    out.append(line)
+    i += 1
+
+s = "".join(out)
 p.write_text(s, encoding="utf-8")
-print("Editor syntax repair applied")
 
-# Fail here with a precise message if the generated source is still invalid.
 compile(s, str(p), "exec")
 print("Python syntax check passed")
