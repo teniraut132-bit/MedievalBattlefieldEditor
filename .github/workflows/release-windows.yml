@@ -11,7 +11,7 @@ on:
       version:
         description: 'Release version, for example 5.0.0'
         required: true
-        default: '5.1.0'
+        default: '5.1.1'
 
 permissions:
   contents: write
@@ -40,6 +40,9 @@ jobs:
 
       - name: Apply 5.1.0 editor patch
         run: python tools/patch_5_1_0.py
+
+      - name: Apply 5.1.1 road-network rendering patch
+        run: python tools/patch_5_1_1.py
 
       - name: Install dependencies
         run: |
