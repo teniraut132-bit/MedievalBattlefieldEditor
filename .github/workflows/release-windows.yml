@@ -55,7 +55,7 @@ jobs:
 
       - name: Build editor
         working-directory: editor
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
+        run: pyinstaller --noconfirm --clean --onedir --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
 
       - name: Determine release version
         shell: pwsh
