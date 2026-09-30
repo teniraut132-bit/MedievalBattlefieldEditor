@@ -1,2 +1,1 @@
-5.2.1 syntax repair rebuild trigger
-2
+5.2.1 syntax repair trigger 3
