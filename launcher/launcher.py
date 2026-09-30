@@ -17,13 +17,13 @@ def vt(v):
         p=[int(x) for x in str(v).lstrip('vV').split('.')];return tuple((p+[0,0,0])[:3])
     except:return (0,0,0)
 def ver():return load(INSTALL/'version.json',{}).get('version',state['installed_version'])
-def api():return f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/releases"
-def get(url):
-    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher','Accept':'application/vnd.github+json'})
-    with urllib.request.urlopen(r,timeout=20) as x:return json.loads(x.read().decode())
+def raw(path,branch='main'):
+    return f"https://raw.githubusercontent.com/{cfg['github_owner']}/{cfg['github_repo']}/{branch}/{path}"
 def get_text(url):
     r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher'})
-    with urllib.request.urlopen(r,timeout=15) as x:return x.read().decode('utf-8')
+    with urllib.request.urlopen(r,timeout=20) as x:return x.read().decode('utf-8')
+def latest():
+    return json.loads(get_text(raw('latest.json')))
 def load_news():
     try:
         d=json.loads(get_text(f"https://raw.githubusercontent.com/{cfg['github_owner']}/{cfg['github_repo']}/{cfg.get('news_branch','main')}/{cfg.get('news_file','news.json')}"))
@@ -56,20 +56,16 @@ def refresh_info(rel=None):
     set_text(news_box,'\n'.join(nl) if nl else 'Пока нет новостей проекта.')
 def update():
     try:
-        status.set('Проверка GitHub…')
-        rel=next((r for r in get(api()) if not r.get('draft') and not r.get('prerelease')),None)
-        if not rel:status.set('Стабильных релизов нет.');return
-        tag=rel['tag_name'].lstrip('vV')
-        if vt(tag)<=vt(ver()):status.set(f'Версия {ver()} уже актуальна.');refresh_info(rel);return
-        asset=next((a for a in rel['assets'] if a['name']==cfg['asset_name']),None)
-        if not asset:raise RuntimeError('В Release отсутствует '+cfg['asset_name'])
-        tmp=Path(tempfile.mkdtemp());z=tmp/'release.zip';status.set(f'Скачивание {tag}…')
-        req=urllib.request.Request(asset['browser_download_url'],headers={'User-Agent':'MedievalBattlefieldLauncher'})
-        with urllib.request.urlopen(req,timeout=120) as r,open(z,'wb') as f:f.write(r.read())
-        chk=next((a for a in rel['assets'] if a['name']==cfg['asset_name']+'.sha256'),None)
-        if chk:
-            q=urllib.request.Request(chk['browser_download_url'],headers={'User-Agent':'MedievalBattlefieldLauncher'})
-            if sha(z).lower()!=urllib.request.urlopen(q,timeout=20).read().decode().split()[0].lower():raise RuntimeError('SHA-256 проверка не пройдена')
+        status.set('Проверка обновлений…')
+        rel=latest();tag=str(rel['version']).lstrip('vV')
+        if vt(tag)<=vt(ver()):
+            status.set(f'Версия {ver()} уже актуальна.');refresh_info(rel);return True
+        url=rel.get('asset_url') or f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/{cfg['asset_name']}"
+        tmp=Path(tempfile.mkdtemp(prefix='MBE_update_'));z=tmp/'release.zip'
+        status.set(f'Скачивание {tag}…')
+        req=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher'})
+        with urllib.request.urlopen(req,timeout=180) as r,open(z,'wb') as f:shutil.copyfileobj(r,f)
+        if rel.get('sha256') and sha(z).lower()!=rel['sha256'].lower():raise RuntimeError('SHA-256 проверка не пройдена')
         st=tmp/'staging';st.mkdir();zipfile.ZipFile(z).extractall(st)
         if not (st/'version.json').exists():
             ds=[d for d in st.iterdir() if d.is_dir()]
@@ -84,22 +80,25 @@ def update():
         if INSTALL.exists():INSTALL.rename(olddir)
         new.rename(INSTALL);shutil.rmtree(olddir,ignore_errors=True)
         state['installed_version']=tag;save(STATE,state);vervar.set('Версия: '+ver());status.set(f'Установлена версия {tag}.')
-        shutil.rmtree(tmp,ignore_errors=True);refresh_info(rel)
+        shutil.rmtree(tmp,ignore_errors=True);refresh_info(rel);return True
     except Exception as e:
-        status.set('Ошибка обновления');messagebox.showerror('Обновление',str(e))
+        status.set('Ошибка обновления');messagebox.showerror('Обновление',str(e));return False
 def threaded():threading.Thread(target=update,daemon=True).start()
 def launch():
-    e=findexe(INSTALL)
-    if not e:
-        threaded(); root.after(700, launch); return
-    try:
-        rel=next((r for r in get(api()) if not r.get('draft') and not r.get('prerelease')),None)
-        if rel and vt(rel['tag_name'].lstrip('vV'))>vt(ver()):
-            status.set('Сначала устанавливаю последнее обновление…'); threaded(); root.after(1200, launch); return
-    except Exception: pass
-    e=findexe(INSTALL)
-    if not e: messagebox.showerror('Редактор','Не удалось установить редактор.'); return
-    subprocess.Popen([str(e)],cwd=str(INSTALL)); root.destroy()
+    def worker():
+        ok=True
+        try:
+            rel=latest()
+            if vt(rel.get('version','0'))>vt(ver()) or not findexe(INSTALL):
+                ok=update()
+        except Exception as e:
+            ok=False
+        e=findexe(INSTALL)
+        if ok and e:
+            root.after(0,lambda:(subprocess.Popen([str(e)],cwd=str(INSTALL)),root.destroy()))
+        elif ok:
+            root.after(0,lambda:messagebox.showerror('Редактор','Редактор не установлен. Нажмите «Проверить обновления».'))
+    threading.Thread(target=worker,daemon=True).start()
 def settings():
     w=tk.Toplevel(root);w.title('Настройки GitHub');w.geometry('520x330');vals={}
     for k,label in [('github_owner','GitHub owner'),('github_repo','Repository'),('asset_name','ZIP asset'),('news_file','Файл новостей'),('news_branch','Ветка новостей')]:
