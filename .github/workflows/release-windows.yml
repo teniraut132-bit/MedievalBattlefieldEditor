@@ -80,6 +80,14 @@ jobs:
       - name: Build launcher
         run: pyinstaller --noconfirm --clean --onefile --windowed --name MedievalBattlefieldLauncher launcher/launcher.py
 
+      - name: Create launcher release metadata
+        shell: pwsh
+        run: |
+          $notes = "Релиз $env:RELEASE_VERSION`n`nАвтоматическое обновление редактора."
+          $sha = (Get-FileHash 'MedievalBattlefieldEditor-Windows-x64.zip' -Algorithm SHA256).Hash
+          $meta = @{ version=$env:RELEASE_VERSION; name='Medieval Battlefield Editor'; notes=$notes; asset_url="https://github.com/${{ github.repository }}/releases/latest/download/MedievalBattlefieldEditor-Windows-x64.zip"; sha256=$sha } | ConvertTo-Json
+          $meta | Set-Content 'latest.json' -Encoding utf8
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -90,4 +98,5 @@ jobs:
           files: |
             MedievalBattlefieldEditor-Windows-x64.zip
             MedievalBattlefieldEditor-Windows-x64.zip.sha256
+            latest.json
             dist/MedievalBattlefieldLauncher.exe
