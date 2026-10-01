@@ -178,6 +178,59 @@ s = s[:start] + line_method + s[end:]
 s=s.replace("        self.draw_road_junctions()\n","        # Junctions are blended by overlapping ribbon strokes; no circle stamps.\n")
 s=s.replace("        self.draw_junctions()\n","        # No decorative junction dots: continuous line ribbons form the joins.\n")
 
+
+# Render the whole visible path network in passes: all banks first, all surfaces
+# second, then all highlights. Per-feature triple-stroking caused each new road
+# to paint its own border over neighboring road surfaces, creating stacked seams.
+render_old = """        for o in self.objects:
+            if o['kind'] in ('river','road') and self._bbox_visible(o,rect):
+                self.draw_line_obj(o)
+        for o in self.objects:
+            if o['kind'] not in ('river','road') and self._bbox_visible(o,rect):
+                self.draw_obj(o)
+"""
+render_new = """        line_objects=[o for o in self.objects
+                      if o['kind'] in ('river','road') and self._bbox_visible(o,rect)]
+        # MB_NETWORK_PASS_RENDER: each visual layer is drawn once across the network.
+        self.draw_line_network_layer(line_objects,'outline')
+        self.draw_line_network_layer(line_objects,'surface')
+        self.draw_line_network_layer(line_objects,'highlight')
+        for o in self.objects:
+            if o['kind'] not in ('river','road') and self._bbox_visible(o,rect):
+                self.draw_obj(o)
+"""
+replace_once(render_old, render_new, "network-wide line rendering")
+
+network_method = '''    def draw_line_network_layer(self,items,layer):
+        for o in items:
+            pts=o.get('points',[])
+            if len(pts)<2:continue
+            p=self.pts(pts)
+            wd=max(1.0,float(o.get('width',25))*self.scale)
+            if o['kind']=='river':
+                if layer=='outline':
+                    color='#4b4238';width=max(5,int(wd+28*self.scale))
+                elif layer=='surface':
+                    color='#4fa8a2';width=max(3,int(wd))
+                else:
+                    if wd*self.scale<=7:continue
+                    color='#83c7bd';width=max(1,int(1.5*self.scale))
+            else:
+                if layer=='outline':
+                    color='#514437';width=max(5,int(wd+10*self.scale))
+                elif layer=='surface':
+                    color='#b7a080';width=max(3,int(wd))
+                else:
+                    if wd*self.scale<=8:continue
+                    color='#d7c29b';width=max(1,int(1.4*self.scale))
+            self.canvas.create_line(*p,fill=color,width=width,smooth=True,
+                                    capstyle='round',joinstyle='round')
+
+'''
+draw_anchor = "    def draw_line_obj(self,o):"
+if s.count(draw_anchor)!=1:raise RuntimeError("draw_line_obj anchor mismatch")
+s=s.replace(draw_anchor,network_method+draw_anchor,1)
+
 p.write_text(s,encoding="utf-8")
 compile(s,str(p),"exec")
 print("Applied 5.6.0 cartography patch; Python syntax check passed")
