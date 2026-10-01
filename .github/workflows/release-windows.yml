@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, for example 5.9.6'
+        description: 'Release version, for example 5.10.0'
         required: true
-        default: '5.9.8'
+        default: '5.10.0'
 
 permissions:
   contents: write
@@ -54,6 +54,7 @@ jobs:
           python tools/patch_5_9_6_library_battle.py
           python tools/patch_5_9_9_import.py
           python tools/restore_v5_8_0_roads_water.py
+          python tools/patch_5_10_0_shared_library_battle_ui.py
 
       - name: Validate source and patch scripts
         shell: pwsh
