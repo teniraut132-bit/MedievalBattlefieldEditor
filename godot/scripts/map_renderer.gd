@@ -35,7 +35,9 @@ var max_zoom: float = 3.5
 
 var tool := "select"
 var terrain_type := "Луг"
+var road_type := "Просёлочная"
 var brush_size := 500.0
+var selected_asset := ""
 var selected_index := -1
 var stroke: Array[Vector2] = []
 var dragging_object := false
@@ -94,6 +96,14 @@ func set_terrain(value: String) -> void:
     if TERRAIN_STYLE.has(value):
         terrain_type = value
     set_tool("terrain")
+
+func set_road_type(value: String) -> void:
+    road_type = value
+    set_tool("road")
+
+func choose_asset(value: String) -> void:
+    selected_asset = value
+    set_tool("asset")
 
 func set_brush_size(value: float) -> void:
     brush_size = clampf(value, 80.0, 1500.0)
@@ -176,6 +186,12 @@ func _unhandled_input(event: InputEvent) -> void:
                         rotate_start_angle = Vector2(float(obj.get("x",0.0)),float(obj.get("y",0.0))).angle_to_point(world_to_local_mouse(event.position))
                         get_viewport().set_input_as_handled()
                         return
+                if tool == "asset":
+                    var place := world_to_local_mouse(event.position)
+                    if not selected_asset.is_empty():
+                        document.add_object({"id":document.next_id("asset"),"kind":"asset","asset":selected_asset,"x":place.x,"y":place.y,"size":180.0,"obj_scale":1.0,"rotation":0.0})
+                    get_viewport().set_input_as_handled()
+                    return
                 if tool == "terrain":
                     stroke = [world_to_local_mouse(event.position)]
                     get_viewport().set_input_as_handled()
@@ -279,7 +295,7 @@ func _finish_network_stroke(kind: String) -> void:
         "width":65.0 if kind == "road" else 90.0,
     }
     if kind == "road":
-        obj["road_type"]="Просёлочная"
+        obj["road_type"]=road_type
     document.add_object(obj)
     stroke.clear()
     queue_redraw()
