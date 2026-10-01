@@ -176,7 +176,7 @@ if s.count(insert_before) != 1:
 s=s.replace(insert_before,terrain_methods+insert_before,1)
 
 replace_once(
-    "        if self.tool in ('river','road'):\n            self.snapshot();self.stroke=[(x,y)];return\n",
+    "        if self.tool in ('river','road_dirt','road_paved','road_cobble'):\n            self.snapshot();self.stroke=[(x,y)];return\n",
     """        if self.tool=='terrain':
             self.snapshot();self.stroke=[(x,y)];self.last=(x,y);return
         if self.tool in ('river','road'):
@@ -186,7 +186,7 @@ replace_once(
 )
 
 replace_once(
-    "        elif self.tool in ('river','road') and self.stroke is not None:\n            if math.hypot(x-self.stroke[-1][0],y-self.stroke[-1][1])>12:self.stroke.append((x,y));self.preview()\n",
+    "        elif self.tool in ('river','road_dirt','road_paved','road_cobble') and self.stroke is not None:\n            if math.hypot(x-self.stroke[-1][0],y-self.stroke[-1][1])>12:self.stroke.append((x,y));self.preview()\n",
     """        elif self.tool=='terrain' and self.stroke is not None:
             if math.hypot(x-self.stroke[-1][0],y-self.stroke[-1][1])>max(12,self.brush*.12):self.stroke.append((x,y));self.preview()
         elif self.tool in ('river','road') and self.stroke is not None:
@@ -196,7 +196,7 @@ replace_once(
 )
 
 replace_once(
-    "    def left_up(self,e):\n        if self.tool in ('river','road') and self.stroke and len(self.stroke)>1:\n",
+    "    def left_up(self,e):\n        if self.tool in ('river','road_dirt','road_paved','road_cobble') and self.stroke and len(self.stroke)>1:\n",
     """    def left_up(self,e):
         if self.tool=='terrain' and self.stroke:
             if len(self.stroke)==1:self.stroke.append(self.stroke[0])
