@@ -19,6 +19,9 @@ def main() -> int:
         print("FAIL: cannot load editor module")
         return 1
 
+    # The editor imports embedded_assets as a sibling module. Match the
+    # import path used when launching the source file directly.
+    sys.path.insert(0, str(EDITOR.parent))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
