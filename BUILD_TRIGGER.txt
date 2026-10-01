@@ -1,2 +1,3 @@
-5.9.8 - final v5.8 road/river renderer rollback
-Build trigger: 2026-10-01T18:05:00+03:00
+5.10.0 - shared sprite library, compact object/landscape browsing, stable map border, battle results/mechanics, resilient launcher updates
+Build trigger: 2026-10-01T20:15:00+03:00
+Roads and rivers: preserve v5.8.0 renderer unchanged.
