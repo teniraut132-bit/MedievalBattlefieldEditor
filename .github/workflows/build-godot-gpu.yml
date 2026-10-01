@@ -45,7 +45,7 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
           unzip -q /tmp/templates.tpz -d /tmp/templates
           cp -r /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
-          "$GODOT_BIN" --headless --path godot --export-release "Windows Desktop" godot/build/MedievalBattlefieldGPU.exe
+          "$GODOT_BIN" --headless --path godot --export-release "Windows Desktop" build/MedievalBattlefieldGPU.exe
 
       - name: Upload prototype
         uses: actions/upload-artifact@v4
