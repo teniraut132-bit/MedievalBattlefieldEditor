@@ -1,2 +1,2 @@
-5.3.3 release - launcher rate limit fallback and correct executable selection
-Build trigger: 2026-10-01T18:00:00+03:00
+5.5.0 release - rebuild launcher and complete Windows bundle
+Build trigger: 2026-10-01T15:00:00+03:00
