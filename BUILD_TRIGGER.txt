@@ -1,2 +1,2 @@
 5.9.6 — persistent sprite library, shared sprite packs, compact tabbed tools, scrollable palette, battle result journal and combat calculation. Roads and rivers unchanged.
-Build trigger: 2026-10-01T16:34:00+03:00
+Build trigger: 2026-10-01T16:37:00+03:00
