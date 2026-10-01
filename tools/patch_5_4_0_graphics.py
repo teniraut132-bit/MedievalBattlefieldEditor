@@ -95,7 +95,7 @@ render_patch = """    def render(self):
             self.draw_selection(self.selected[1])
 
 """
-render_pattern = re.compile(r"(?ms)^    def render\(self\):\\n.*?(?=^    def pts\(self,p\):)")
+render_pattern = re.compile(r"(?ms)^    def render\(self\):\n.*?(?=^    def pts\(self,p\):)")
 # The pattern above is intentionally line-anchored; keep class methods after render untouched.
 m = render_pattern.search(s)
 if not m:
