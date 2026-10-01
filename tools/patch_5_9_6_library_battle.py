@@ -408,7 +408,6 @@ once("""        if u['type']=='Осадные':self.combo('Орудие',SIEGE,u
 """, "equipment condition property")
 
 # The map border is intentionally not changed here. Roads and rivers are intentionally untouched.
-s += "\\n" if not s.endswith("\\n") else ""
 p.write_text(s,encoding="utf-8")
 compile(s,str(p),"exec")
 print("5.9.6 sprite library, compact tabs, and battle results patch applied; syntax check passed")
