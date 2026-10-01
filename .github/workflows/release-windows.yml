@@ -97,6 +97,6 @@ jobs:
           files: |
             MedievalBattlefieldEditor-Windows-x64.zip
             MedievalBattlefieldEditor-Windows-x64.zip.sha256
-            MedievalBattlefieldLauncher.exe
+            dist/MedievalBattlefieldLauncher.exe
             MedievalBattlefieldLauncher-Windows-x64.zip
             MedievalBattlefieldLauncher-Windows-x64.zip.sha256
