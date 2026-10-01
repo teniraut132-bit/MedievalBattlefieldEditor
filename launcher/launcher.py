@@ -1,4 +1,4 @@
-import json, shutil, subprocess, sys, tempfile, threading, urllib.request, zipfile, hashlib
+import json, shutil, subprocess, sys, tempfile, threading, urllib.request, urllib.error, zipfile, hashlib, ssl, time
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -20,9 +20,25 @@ def vt(v):
     except:return (0,0,0)
 def ver():return load(INSTALL/'version.json',{}).get('version',state.get('installed_version','0.0.0'))
 def api():return f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest"
-def get(url,timeout=8):
-    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/5.9.0','Accept':'application/vnd.github+json'})
-    with urllib.request.urlopen(r,timeout=timeout) as x:return json.loads(x.read().decode('utf-8-sig'))
+def _urlopen_retry(req,timeout):
+    ctx=ssl.create_default_context()
+    last=None
+    for attempt in range(4):
+        try:
+            return urllib.request.urlopen(req,timeout=timeout,context=ctx)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            last=exc
+            if attempt>=3: raise
+            time.sleep(0.8*(attempt+1))
+    raise last
+
+def get(url,timeout=10):
+    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.0','Accept':'application/vnd.github+json','Connection':'close'})
+    with _urlopen_retry(r,timeout) as x:return json.loads(x.read().decode('utf-8-sig'))
+
+def get_bytes(url,timeout=90):
+    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.0','Accept':'application/octet-stream','Connection':'close'})
+    with _urlopen_retry(r,timeout) as x:return x.read()
 def sha(p):
     h=hashlib.sha256()
     with open(p,'rb') as f:
@@ -54,13 +70,11 @@ def update():
         if not asset:raise RuntimeError('В последнем GitHub Release отсутствует '+cfg['asset_name'])
         tmp=Path(tempfile.mkdtemp(prefix='mb-update-')); z=tmp/'release.zip'
         ui_status(f'Скачивание версии {tag}…')
-        req=urllib.request.Request(asset['browser_download_url'],headers={'User-Agent':'MedievalBattlefieldLauncher/5.9.0'})
-        with urllib.request.urlopen(req,timeout=90) as r,open(z,'wb') as f:shutil.copyfileobj(r,f,1024*1024)
+        with open(z,'wb') as f:f.write(get_bytes(asset['browser_download_url'],90))
         chk=next((a for a in rel.get('assets',[]) if a['name']==cfg['asset_name']+'.sha256'),None)
         expected=None
         if chk:
-            q=urllib.request.Request(chk['browser_download_url'],headers={'User-Agent':'MedievalBattlefieldLauncher/5.9.0'})
-            with urllib.request.urlopen(q,timeout=10) as r:expected=r.read().decode().split()[0]
+            expected=get_bytes(chk['browser_download_url'],15).decode('utf-8-sig').split()[0]
         elif str(asset.get('digest','')).startswith('sha256:'):expected=asset['digest'].split(':',1)[1]
         if expected and sha(z).lower()!=expected.lower():raise RuntimeError('Проверка SHA-256 не пройдена: архив повреждён или изменён.')
         ui_status('Проверка и распаковка файлов…')
