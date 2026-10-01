@@ -20,17 +20,25 @@ def once(old, new, label):
 once("from tkinter import ttk, filedialog, messagebox",
      "from tkinter import ttk, filedialog, messagebox, simpledialog",
      "simpledialog import")
-once("        self._render_pending=False;self._render_after=None;self._render_revision=0\n",
+once("        self._render_pending=False;self._render_after=None;self._render_revision=0\\n",
 """        self._render_pending=False;self._render_after=None;self._render_revision=0
-        # MB_FEATURES_5_9_6: persistent custom sprite library, kept across app updates.
+        # MB_FEATURES_5_9_6: battle result history.
+        self.battle_history=[]
+""", "battle history state")
+
+once("""        self.user_asset_dir = asset_root / 'user_assets'
+        self.user_asset_dir.mkdir(parents=True, exist_ok=True)
+        self.user_asset_pil_cache = {}
+""",
+"""        # MB_FEATURES_5_9_6: stable per-user library survives launcher updates.
         self.user_asset_dir = Path(os.environ.get('APPDATA', str(Path.home()))) / 'MedievalBattlefieldEditor' / 'Sprites'
         self.user_asset_dir.mkdir(parents=True, exist_ok=True)
+        self.user_asset_pil_cache = {}
         self.custom_sprite_dir = self.user_asset_dir
         self.custom_sprite_meta_path = self.custom_sprite_dir / 'library.json'
         try:self.custom_sprite_meta=json.loads(self.custom_sprite_meta_path.read_text(encoding='utf-8'))
         except Exception:self.custom_sprite_meta={}
-        self.battle_history=[]
-""", "persistent sprite state")
+""", "persistent sprite storage")
 
 # Compact tabbed tool shelf. Tool identifiers and all road/water drawing code remain unchanged.
 start = s.index("        lf=ttk.LabelFrame(left,text='Инструменты')")
