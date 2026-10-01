@@ -137,7 +137,9 @@ if s.count(needle) != 1:
     raise RuntimeError(f"custom sprite decoding: expected one asset_pil definition, found {s.count(needle)}")
 s = s.replace(needle, replacement, 1)
 
-# Render connected paths as layered ribbons and remove decorative circular junction stamps.
+# MB_ROADS_RIVERS_5_8_0_ROLLBACK: restore the v5.8.0 layered-ribbon renderer.
+# Roads and rivers are drawn per feature with rounded caps/joins; do not replace
+# this with a global network mask, which changed the established map appearance.
 line_method = '''    def draw_line_obj(self,o):
         pts=o.get('points',[])
         if len(pts)<2:return
