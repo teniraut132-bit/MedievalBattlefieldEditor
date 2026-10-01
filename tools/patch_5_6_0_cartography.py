@@ -19,8 +19,14 @@ replace_once(
     "        self._render_pending=False;self._render_after=None;self._render_revision=0\n",
     """        self._render_pending=False;self._render_after=None;self._render_revision=0
         # MB_CARTOGRAPHY_5_6_0
-        asset_root = Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
-        if asset_root.name.lower() == 'editor':asset_root = asset_root.parent
+        if getattr(sys,'frozen',False):
+            exe_dir=Path(sys.executable).resolve().parent
+            if exe_dir.name.lower()=='editor':asset_root=exe_dir.parent
+            elif exe_dir.parent.name.lower()=='editor':asset_root=exe_dir.parent.parent
+            else:asset_root=exe_dir
+        else:
+            asset_root=Path(__file__).resolve().parent
+            if asset_root.name.lower()=='editor':asset_root=asset_root.parent
         self.user_asset_dir = asset_root / 'user_assets'
         self.user_asset_dir.mkdir(parents=True, exist_ok=True)
         self.user_asset_pil_cache = {}
