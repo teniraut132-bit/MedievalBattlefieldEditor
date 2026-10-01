@@ -18,12 +18,12 @@ for marker in ("MB_ROADS_WATER_V5_8_0","MB_LANDSCAPE_5_9_3","MB_INTERACTION_5_9_
 
 # Road/water invariants: the final renderer must use the v5.8 network union,
 # and not individually paint road/river layers from render().
-render=next(n for n in app.body if isinstance(n,ast.FunctionDef) and n.name=="render")
-render_text=ast.get_source_segment(s,render) or ""
+render_nodes=[n for n in app.body if isinstance(n,ast.FunctionDef) and n.name in ("render","_render_now")]
+render_text="\n".join(ast.get_source_segment(s,n) or "" for n in render_nodes)
 if "draw_network_layer('river',rect)" not in render_text or "draw_network_layer('road',rect)" not in render_text:
-    raise RuntimeError("Road/water renderer invariant failed: unified v5.8 network calls missing")
+    raise RuntimeError("Road/water renderer invariant failed: unified v5.8 network calls missing from render/_render_now")
 if "draw_line_obj(o)" in render_text:
-    raise RuntimeError("Road/water renderer invariant failed: render() still draws per-segment line objects")
+    raise RuntimeError("Road/water renderer invariant failed: render path still draws per-segment line objects")
 
 # Non-network scaling should exist, but the v5.8 road/river network itself is not
 # changed by the new scaling feature.
