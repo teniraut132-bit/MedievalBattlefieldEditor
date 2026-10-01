@@ -20,7 +20,7 @@ def once(old, new, label):
 once("from tkinter import ttk, filedialog, messagebox",
      "from tkinter import ttk, filedialog, messagebox, simpledialog",
      "simpledialog import")
-once("        self._render_pending=False;self._render_after=None;self._render_revision=0\\n",
+once("        self._render_pending=False;self._render_after=None;self._render_revision=0\n",
 """        self._render_pending=False;self._render_after=None;self._render_revision=0
         # MB_FEATURES_5_9_6: battle result history.
         self.battle_history=[]
