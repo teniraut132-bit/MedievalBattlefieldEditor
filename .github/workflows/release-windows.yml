@@ -47,6 +47,9 @@ jobs:
       - name: Apply 5.2.0 road-network patch
         run: python tools/patch_5_2_0.py
 
+      - name: Restore deterministic biome, river and road layer order
+        run: python tools/patch_5_3_5.py
+
       - name: Repair editor syntax after patches
         run: python tools/repair_editor_syntax.py
 
