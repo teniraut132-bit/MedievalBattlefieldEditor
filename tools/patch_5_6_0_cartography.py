@@ -119,7 +119,7 @@ s = s[:start] + new_palette + s[end:]
 
 # The syntax-repair pass normalizes asset_pil() and inserts _write_sprite_error().
 # Inject custom-file decoding before the existing embedded-asset lookup.
-needle = "    def asset_pil(self,name):\\n        key=self.asset_key(name)\\n"
+needle = "    def asset_pil(self,name):"
 replacement = """    def asset_pil(self,name):
         if isinstance(name,str) and name.startswith('custom:'):
             filename=name.split(':',1)[1]
@@ -132,10 +132,9 @@ replacement = """    def asset_pil(self,name):
             except Exception as exc:
                 self._write_sprite_error(name,type(exc).__name__+': '+str(exc))
                 return None
-        key=self.asset_key(name)
 """
 if s.count(needle) != 1:
-    raise RuntimeError(f"custom sprite decoding: expected one normalized asset_pil anchor, found {s.count(needle)}")
+    raise RuntimeError(f"custom sprite decoding: expected one asset_pil definition, found {s.count(needle)}")
 s = s.replace(needle, replacement, 1)
 
 # Render connected paths as layered ribbons and remove decorative circular junction stamps.
