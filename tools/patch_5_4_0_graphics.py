@@ -63,36 +63,45 @@ replace_once(
     "terrain selector"
 )
 
-replace_once(
-    """        self.canvas.create_rectangle(0,0,w,h,fill='#b8a97c',outline='',tags='background')
-
-        rect=self._visible_world_rect()
-        # Draw only objects intersecting the current viewport.
-        for o in self.objects:
-            if o['kind'] in ('river','road') and self._bbox_visible(o,rect):
-                self.draw_line_obj(o)
-        for o in self.objects:
-            if o['kind'] not in ('river','road') and self._bbox_visible(o,rect):
-                self.draw_obj(o)
-""",
-    """        self.canvas.create_rectangle(0,0,w,h,fill='#b8a97c',outline='',tags='background')
+# Replace the complete renderer because the earlier road patches add
+# road-network passes to render(), so the original renderer text no longer matches.
+render_patch = """    def render(self):
+        self._render_revision += 1
+        self.canvas.delete('all')
+        w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height())
+        self.canvas.create_rectangle(0,0,w,h,fill='#b8a97c',outline='',tags='background')
         self._draw_ground_texture(w,h)
-
         rect=self._visible_world_rect()
-        # Terrain paint sits beneath water, roads, buildings and units.
+        # Paint biome strokes first, then water, road underlays and road surfaces.
         for o in self.objects:
             if o.get('kind')=='terrain' and self._bbox_visible(o,rect):
                 self.draw_terrain_obj(o)
-        # Draw only visible river and road geometry, then decorative sprites.
         for o in self.objects:
-            if o['kind'] in ('river','road') and self._bbox_visible(o,rect):
+            if o.get('kind')=='river' and self._bbox_visible(o,rect):
                 self.draw_line_obj(o)
+        self.draw_road_network_underlay()
         for o in self.objects:
-            if o['kind'] not in ('river','road','terrain') and self._bbox_visible(o,rect):
+            if o.get('kind')=='road' and self._bbox_visible(o,rect):
+                self.draw_line_obj(o)
+        self.draw_road_junctions()
+        self.draw_junctions()
+        for o in self.objects:
+            if o.get('kind') not in ('river','road','terrain') and self._bbox_visible(o,rect):
                 self.draw_obj(o)
-""",
-    "render layering"
-)
+        for u in self.units:
+            if rect[0]-100 <= u['x'] <= rect[2]+100 and rect[1]-100 <= u['y'] <= rect[3]+100:
+                self.draw_unit(u)
+        if self.selected:
+            self.draw_selection(self.selected[1])
+
+"""
+render_pattern = re.compile(r"(?ms)^    def render\(self\):\\n.*?(?=^    def pts\(self,p\):)")
+# The pattern above is intentionally line-anchored; keep class methods after render untouched.
+m = render_pattern.search(s)
+if not m:
+    raise RuntimeError("Could not locate render() method before pts()")
+s = s[:m.start()] + render_patch + s[m.end():]
+
 
 replace_once(
     "        if o.get('kind') in ('river','road'):\n",
