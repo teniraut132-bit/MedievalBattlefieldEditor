@@ -1,2 +1,2 @@
-5.2.4 - fixed road patch syntax and guaranteed road geometry helpers
-Build trigger: 2026-10-01T10:25:00+03:00
+5.2.4 rebuild - road patch guard fixed
+Build trigger: 2026-10-01T10:28:00+03:00
