@@ -10,7 +10,7 @@ print("=== ENGINE 6 FINAL RENDER INSPECTION ===")
 for n in app.body:
     if isinstance(n,ast.FunctionDef) and n.name in names:
         print(f"\n--- {n.name} lines {n.lineno}-{n.end_lineno} ---")
-        print(ast.get_source_segment(s,n))
+        print((ast.get_source_segment(s,n) or '').encode('ascii','backslashreplace').decode('ascii'))
 print("\n=== INITIALIZATION MARKERS ===")
 for i,line in enumerate(s.splitlines(),1):
     if any(k in line for k in ("_render_pending","canvas=","self.objects=","self.units=","self.scale=")):
