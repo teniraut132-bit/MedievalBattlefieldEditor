@@ -317,91 +317,118 @@ func _finish_network_stroke(kind: String) -> void:
 func _network_key(kind: String) -> String:
     return kind
 
+func _find_network_node(nodes: Array, p: Vector2, snap: float) -> int:
+    var nearest := -1
+    var dist := snap
+    for i in range(nodes.size()):
+        var d: float = nodes[i].distance_to(p)
+        if d < dist:
+            dist = d
+            nearest = i
+    if nearest >= 0:
+        nodes[nearest] = (nodes[nearest] + p) * 0.5
+        return nearest
+    nodes.append(p)
+    return nodes.size() - 1
+
+func _edge_index(edges: Array, edge: Dictionary) -> int:
+    for i in range(edges.size()):
+        if edges[i].get("a", -1) == edge.get("a", -2) and edges[i].get("b", -1) == edge.get("b", -2) and edges[i].get("id", -1) == edge.get("id", -2):
+            return i
+    return edges.find(edge)
+
+func _traverse_network_chain(edges: Array, adjacency: Dictionary, used: Dictionary, start_node: int, first_edge: Dictionary) -> Array:
+    const SNAP := 140.0
+    var chain: Array = []
+    var current_node := start_node
+    var edge := first_edge
+    while true:
+        var eid := _edge_index(edges, edge)
+        if eid < 0 or used.has(eid):
+            break
+        used[eid] = true
+        var forward: bool = int(edge.get("a",-1)) == current_node
+        var pts: Array = edge.get("points", []).duplicate()
+        if not forward:
+            pts.reverse()
+        if chain.is_empty():
+            chain.append_array(pts)
+        else:
+            if chain.back().distance_to(pts.front()) < SNAP:
+                pts[0] = chain.back()
+            chain.append_array(pts.slice(1))
+        current_node = int(edge.get("b",-1)) if forward else int(edge.get("a",-1))
+        var neighbors: Array = adjacency.get(current_node, [])
+        if neighbors.size() != 2:
+            break
+        var candidate: Dictionary = neighbors[0]
+        if _edge_index(edges, candidate) == eid:
+            candidate = neighbors[1]
+        edge = candidate
+    return chain
+
 func _build_network_chains(kind: String) -> Array:
     var raw_paths := document.extract_paths(kind)
-    var nodes: Array[Vector2] = []
+    var nodes: Array = []
     var edges: Array = []
     const SNAP := 140.0
 
-    func node_for(p: Vector2) -> int:
-        var nearest := -1
-        var dist := SNAP
-        for i in range(nodes.size()):
-            var d := nodes[i].distance_to(p)
-            if d < dist:
-                dist=d;nearest=i
-        if nearest >= 0:
-            nodes[nearest]=(nodes[nearest]+p)*0.5
-            return nearest
-        nodes.append(p)
-        return nodes.size()-1
-
     for path_index in range(raw_paths.size()):
-        var pts: Array[Vector2] = raw_paths[path_index].get("points",[])
-        if pts.size()<2:
+        var points: Array = raw_paths[path_index].get("points", [])
+        if points.size() < 2:
             continue
-        var a := node_for(pts.front())
-        var b := node_for(pts.back())
-        edges.append({"a":a,"b":b,"points":pts,"width":float(raw_paths[path_index].get("width",25.0)),"road_type":str(raw_paths[path_index].get("road_type","Просёлочная"))})
+        var a := _find_network_node(nodes, points.front(), SNAP)
+        var b := _find_network_node(nodes, points.back(), SNAP)
+        edges.append({
+            "id": path_index,
+            "a": a,
+            "b": b,
+            "points": points,
+            "width": float(raw_paths[path_index].get("width",25.0)),
+            "road_type": str(raw_paths[path_index].get("road_type","Просёлочная"))
+        })
 
-    var adj: Dictionary = {}
+    var adjacency: Dictionary = {}
     for i in range(nodes.size()):
-        adj[i]=[]
-    for e in edges:
-        adj[e.a].append(e)
-        adj[e.b].append(e)
+        adjacency[i] = []
+    for edge in edges:
+        adjacency[edge.get("a")].append(edge)
+        adjacency[edge.get("b")].append(edge)
 
     var used: Dictionary = {}
     var chains: Array = []
 
-    func edge_id(e: Dictionary) -> int:
-        return edges.find(e)
-
-    func traverse(start_node: int, first_edge: Dictionary) -> Array[Vector2]:
-        var chain: Array[Vector2] = []
-        var current_node := start_node
-        var edge := first_edge
-        while true:
-            var eid := edge_id(edge)
-            if used.has(eid):
-                break
-            used[eid]=true
-            var forward := edge.a == current_node
-            var pts: Array[Vector2] = edge.points.duplicate()
-            if not forward:
-                pts.reverse()
-            if chain.is_empty():
-                chain.append_array(pts)
-            else:
-                if chain.back().distance_to(pts.front()) < SNAP:
-                    pts[0]=chain.back()
-                chain.append_array(pts.slice(1))
-            current_node = edge.b if forward else edge.a
-            if adj[current_node].size() != 2:
-                break
-            var next_edge = adj[current_node][0] if edge_id(adj[current_node][0]) != eid else adj[current_node][1]
-            edge = next_edge
-        return chain
-
-    # Start chains at leaves and junctions. Every degree-2 continuation is merged.
+    # Start at leaves and junctions so degree-2 continuations become one
+    # drawable chain. This is the key to avoiding duplicated caps and dark
+    # stacked seams at ordinary joins.
     for node in range(nodes.size()):
-        if adj[node].size() == 2:
+        var neighbors: Array = adjacency.get(node, [])
+        if neighbors.size() == 2:
             continue
-        for e in adj[node]:
-            var eid := edge_id(e)
+        for edge in neighbors:
+            var eid := _edge_index(edges, edge)
             if used.has(eid):
                 continue
-            var chain := traverse(node,e)
-            if chain.size()>=2:
-                chains.append({"points":chain,"width":float(e.width),"road_type":str(e.road_type)})
+            var chain := _traverse_network_chain(edges, adjacency, used, node, edge)
+            if chain.size() >= 2:
+                chains.append({
+                    "points": chain,
+                    "width": float(edge.get("width",25.0)),
+                    "road_type": str(edge.get("road_type","Просёлочная"))
+                })
 
-    # Closed loops without endpoints.
-    for e in edges:
-        var eid:=edge_id(e)
-        if used.has(eid):continue
-        var chain:=traverse(e.a,e)
-        if chain.size()>=2:
-            chains.append({"points":chain,"width":float(e.width),"road_type":str(e.road_type)})
+    # Closed loops have no leaves/junctions, so consume remaining edges.
+    for edge in edges:
+        var eid := _edge_index(edges, edge)
+        if used.has(eid):
+            continue
+        var chain := _traverse_network_chain(edges, adjacency, used, int(edge.get("a",-1)), edge)
+        if chain.size() >= 2:
+            chains.append({
+                "points": chain,
+                "width": float(edge.get("width",25.0)),
+                "road_type": str(edge.get("road_type","Просёлочная"))
+            })
     return chains
 
 func _get_network(kind: String) -> Array:
