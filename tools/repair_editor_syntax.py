@@ -265,7 +265,7 @@ render_body = [
     "        if rect[0]-100 <= u['x'] <= rect[2]+100 and rect[1]-100 <= u['y'] <= rect[3]+100:self.draw_unit(u)",
     "    if self.selected:self.draw_selection(self.selected[1])",
 ]
-s=s[:m.start()]+"\\n".join(base+line for line in render_body)+"\\n"+s[m.end():]
+s=s[:m.start()]+"\n".join(base+line for line in render_body)+"\\n"+s[m.end():]
 
 line_re = re.compile(r"(?ms)^[ \\t]*def draw_line_obj\\(self,o.*?\\):\\r?\\n.*?(?=^[ \\t]*def line_segments\\(self,o\\):)")
 m=line_re.search(s)
@@ -292,7 +292,7 @@ line_body=[
 "        dash=(2,5) if part=='detail' and rt=='Брусчаточная' else (7,6) if part=='detail' and rt=='Мощенная' else ()",
 "        self.canvas.create_line(*p,fill=color,width=max(1,int(width)),smooth=True,capstyle='round',joinstyle='round',dash=dash)",
 ]
-s=s[:m.start()]+"\\n".join(base+line for line in line_body)+"\\n"+s[m.end():]
+s=s[:m.start()]+"\n".join(base+line for line in line_body)+"\\n"+s[m.end():]
 
 asset_re = re.compile(r"(?ms)^[ \\t]*def asset_pil\\(self,name\\):\\r?\\n.*?(?=^[ \\t]*def place_asset\\(self,name\\):)")
 m=asset_re.search(s)
@@ -317,7 +317,7 @@ asset_body=[
 "        self.asset_load_errors[normalized]=repr(exc)",
 "        return None",
 ]
-s=s[:m.start()]+"\\n".join(base+line for line in asset_body)+"\\n"+s[m.end():]
+s=s[:m.start()]+"\n".join(base+line for line in asset_body)+"\\n"+s[m.end():]
 
 tree=ast.parse(s,filename=str(p))
 app=next((n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='App'),None)
