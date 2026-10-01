@@ -1,2 +1,2 @@
-5.2.2 - fixed launcher GitHub Releases API download and package validation
-Build trigger: 2026-10-01T09:50:00+03:00
+5.2.3 - restored road geometry helper methods required by junction renderer
+Build trigger: 2026-10-01T10:20:00+03:00
