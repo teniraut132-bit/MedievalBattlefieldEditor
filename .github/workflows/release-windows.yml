@@ -47,6 +47,9 @@ jobs:
       - name: Migrate all remaining features into Engine 6
         run: python tools/migrate_engine_6.py
 
+      - name: Inspect final Engine 6 render path
+        run: python tools/inspect_engine_6.py
+
       - name: Validate Engine 6 structure and road/water invariants
         run: python tools/validate_engine_6.py
 
