@@ -28,4 +28,6 @@ if "draw_line_obj(o)" in render_text:
 # Non-network scaling should exist, but the v5.8 road/river network itself is not
 # changed by the new scaling feature.
 if "obj_scale" not in s:raise RuntimeError("Object scaling not present")
+if "MB_RUNTIME_RENDER_GUARD_6_0_1" not in s:raise RuntimeError("Blank-map runtime guard missing")
+if "def fit_map_view(self)" not in s:raise RuntimeError("Fit-view method missing")
 print("PASS: engine 6 structural validation.")
