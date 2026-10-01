@@ -14,12 +14,14 @@ old="""    def render(self):
         self._render_revision += 1
 """
 new="""    def render(self):
-        # MB_PERF_5_9_0: coalesce repeated redraw requests into one Tk idle callback.
+        # MB_PERF_5_9_0: coalesce bursts of mouse/zoom events into one redraw.
+        # A short delay keeps Tk responsive while panning/zooming instead of
+        # rendering a full frame for every mouse event.
         if self._render_pending:
             return
         self._render_pending=True
         try:
-            self._render_after=self.root.after_idle(self._render_now)
+            self._render_after=self.root.after(16,self._render_now)
         except tk.TclError:
             self._render_pending=False
 
