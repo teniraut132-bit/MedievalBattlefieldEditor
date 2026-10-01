@@ -52,6 +52,7 @@ jobs:
           python tools/patch_5_9_4_interaction.py
           python tools/patch_5_9_5_map_boundary.py
           python tools/patch_5_9_6_library_battle.py
+          python tools/patch_5_9_9_import.py
           python tools/restore_v5_8_0_roads_water.py
 
       - name: Validate source and patch scripts
