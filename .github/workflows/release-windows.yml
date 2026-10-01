@@ -11,7 +11,7 @@ on:
       version:
         description: 'Release version, for example 6.0.0'
         required: true
-        default: '6.0.0'
+        default: '6.0.1'
 
 permissions:
   contents: write
@@ -52,6 +52,9 @@ jobs:
 
       - name: Runtime-test final Engine 6 renderer
         run: python tools/smoke_test_engine6_render.py
+
+      - name: Apply 6.0.1 runtime render guard and fit-view recovery
+        run: python tools/patch_runtime_render_guard_6_0_1.py
 
       - name: Validate Engine 6 structure and road/water invariants
         run: python tools/validate_engine_6.py
