@@ -1,0 +1,69 @@
+from pathlib import Path
+import re
+
+p = Path("editor/Medieval_Battlefield_Editor_v4.py")
+s = p.read_text(encoding="utf-8")
+
+# Make road rendering self-contained: no second underlay pass over rivers.
+start = s.index("    def draw_line_obj(self,o):")
+end = s.index("    def line_segments(self,o):", start)
+new = r'''    def draw_line_obj(self,o):
+        p=self.pts(o.get('points',[]))
+        if len(p)<4:
+            return
+        wd=max(1.0,o.get('width',25)*self.scale)
+        if o.get('kind')=='river':
+            self.canvas.create_line(*p,fill='#4b4238',width=max(8,int(wd+32*self.scale)),smooth=True,capstyle='round',joinstyle='round')
+            self.canvas.create_line(*p,fill='#4fa8a2',width=max(5,int(wd)),smooth=True,capstyle='round',joinstyle='round')
+            self.canvas.create_line(*p,fill='#8ccbc1',width=max(1,int(2*self.scale)),smooth=True,capstyle='round',joinstyle='round')
+            return
+        rt=o.get('road_type','Просёлочная')
+        colors={
+            'Просёлочная':('#4a3b2d','#b79a70','#dbc79f'),
+            'Мощенная':('#51483e','#756b5d','#b9ad96'),
+            'Брусчаточная':('#4a3b2d','#8b7b67','#c5b69a')
+        }
+        edge,surf,detail=colors.get(rt,colors['Просёлочная'])
+        self.canvas.create_line(*p,fill=edge,width=max(5,int(wd+10*self.scale)),smooth=True,capstyle='round',joinstyle='round')
+        self.canvas.create_line(*p,fill=surf,width=max(3,int(wd)),smooth=True,capstyle='round',joinstyle='round')
+        dash=(2,5) if rt=='Брусчаточная' else (7,6) if rt=='Мощенная' else ()
+        self.canvas.create_line(*p,fill=detail,width=max(1,int(wd*.13)),smooth=True,capstyle='round',joinstyle='round',dash=dash)
+
+'''
+s = s[:start] + new + s[end:]
+
+# Remove the old underlay call: it painted road outlines after all rivers.
+s = re.sub(r"(?m)^\s*self\.draw_road_network_underlay\(\)\s*\n", "", s)
+
+# Disable intersection blobs; round-capped road strokes already form clean joins.
+start = s.find("    def draw_road_junctions(self):")
+if start >= 0:
+    end = s.find("    def draw_obj(self,o):", start)
+    if end < 0:
+        raise RuntimeError("Could not find draw_obj() after draw_road_junctions()")
+    s = s[:start] + """    def draw_road_junctions(self):
+        # Road joins are formed by the road strokes. Avoid painting blobs over
+        # rivers or terrain at intersections.
+        return
+
+""" + s[end:]
+
+# Ensure the final road pass is after the initial mixed river/road pass.
+# Insert only if the renderer does not already have an explicit road redraw.
+if "if o.get('kind')=='road' and self._bbox_visible(o,rect):" not in s:
+    needle = "        self.draw_junctions()"
+    if needle not in s:
+        raise RuntimeError("Could not find renderer insertion point")
+    s = s.replace(
+        needle,
+        "        for o in self.objects:\n"
+        "            if o.get('kind')=='road' and self._bbox_visible(o,rect):\n"
+        "                self.draw_line_obj(o)\n"
+        "        self.draw_road_junctions()\n"
+        "        self.draw_junctions()",
+        1
+    )
+
+p.write_text(s, encoding="utf-8")
+compile(s, str(p), "exec")
+print("5.2.5 road/river layer patch applied; syntax check passed")
