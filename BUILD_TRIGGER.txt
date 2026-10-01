@@ -1,2 +1,2 @@
-5.2.3 - restored road geometry helper methods required by junction renderer
-Build trigger: 2026-10-01T10:20:00+03:00
+5.2.4 - fixed road patch syntax and guaranteed road geometry helpers
+Build trigger: 2026-10-01T10:25:00+03:00
