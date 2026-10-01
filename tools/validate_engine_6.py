@@ -9,11 +9,11 @@ app=next((n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=="App"),
 if app is None:raise RuntimeError("App class missing")
 methods={n.name for n in app.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}
 required={"render","draw_network_layer","paint_biome","draw_biome_layer","draw_map_boundary","build_palette",
-          "import_sprites","import_sprite_pack","export_sprite_pack","battle","show_battle_results","set_tool"}
+          "import_sprites","import_sprite_pack","export_sprite_pack","battle","show_battle_results","set_tool","refresh_shared_sprite_library"}
 missing=sorted(required-methods)
 if missing:raise RuntimeError("Missing App methods: "+", ".join(missing))
 for marker in ("MB_ROADS_WATER_V5_8_0","MB_LANDSCAPE_5_9_3","MB_INTERACTION_5_9_4","MB_MAP_BOUNDARY_5_9_5",
-               "MB_FEATURES_5_9_6","MB_IMPORT_FIX_5_9_9","MB_PERF_5_9_0","MB_ENGINE_6_0_0_SCALING"):
+               "MB_FEATURES_5_9_6","MB_IMPORT_FIX_5_9_9","MB_PERF_5_9_0","MB_ENGINE_6_0_0_SCALING","MB_FEATURES_6_1_0_SHARED_LIBRARY_BATTLE_UI"):
     if marker not in s:raise RuntimeError("Missing feature marker: "+marker)
 
 # Road/water invariants: the final renderer must use the v5.8 network union,
