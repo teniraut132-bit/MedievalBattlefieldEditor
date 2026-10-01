@@ -1,2 +1,2 @@
-5.9.5 — stylized visible map boundary; existing roads, rivers, biomes and object controls preserved
-Build trigger: 2026-10-01T15:35:00+03:00
+5.9.6 — persistent custom sprite library, import/export sprite packs, compact tabbed tools, scrollable asset palette, battle results journal and expanded combat calculation. Roads and rivers intentionally unchanged.
+Build trigger: 2026-10-01T16:23:00+03:00
