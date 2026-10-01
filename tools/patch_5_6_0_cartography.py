@@ -117,10 +117,10 @@ new_palette = '''    def build_palette(self):
 '''
 s = s[:start] + new_palette + s[end:]
 
-# Custom sprites use the same rendering path as embedded art.
-replace_once(
-    "    def asset_pil(self,name):\n        if name in self.asset_pil_cache:\n            return self.asset_pil_cache[name]\n        key=self.asset_key(name)\n",
-    """    def asset_pil(self,name):
+# The syntax-repair pass normalizes asset_pil() and inserts _write_sprite_error().
+# Inject custom-file decoding before the existing embedded-asset lookup.
+needle = "    def asset_pil(self,name):\\n        key=self.asset_key(name)\\n"
+replacement = """    def asset_pil(self,name):
         if isinstance(name,str) and name.startswith('custom:'):
             filename=name.split(':',1)[1]
             if filename in self.user_asset_pil_cache:return self.user_asset_pil_cache[filename]
@@ -129,13 +129,14 @@ replace_once(
                 with Image.open(path) as source:im=source.convert('RGBA')
                 self.user_asset_pil_cache[filename]=im
                 return im
-            except Exception:return None
-        if name in self.asset_pil_cache:
-            return self.asset_pil_cache[name]
+            except Exception as exc:
+                self._write_sprite_error(name,type(exc).__name__+': '+str(exc))
+                return None
         key=self.asset_key(name)
-""",
-    "custom sprite decoding"
-)
+"""
+if s.count(needle) != 1:
+    raise RuntimeError(f"custom sprite decoding: expected one normalized asset_pil anchor, found {s.count(needle)}")
+s = s.replace(needle, replacement, 1)
 
 # Render connected paths as layered ribbons and remove decorative circular junction stamps.
 line_method = '''    def draw_line_obj(self,o):
