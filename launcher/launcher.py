@@ -30,8 +30,13 @@ def sha(p):
     return h.hexdigest()
 def findexe(p):
     for n in ['MedievalBattlefieldEditor.exe','Medieval_Battlefield_Editor_v4.exe']:
-        found=next(p.rglob(n),None)
-        if found and found.is_file():return found
+        q=p/n
+        if q.is_file():return q
+    for n in ['MedievalBattlefieldEditor.exe','Medieval_Battlefield_Editor_v4.exe']:
+        hits=[q for q in p.rglob(n) if q.is_file() and 'backups' not in {part.lower() for part in q.parts}]
+        if hits:
+            hits.sort(key=lambda q:(len(q.relative_to(p).parts),str(q).lower()))
+            return hits[0]
 def ui_status(text):
     if 'root' in globals() and root.winfo_exists():root.after(0,lambda: status.set(text) if root.winfo_exists() else None)
 def ui_error(title,text):
