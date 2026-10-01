@@ -320,15 +320,21 @@ asset_body=[
 s=s[:m.start()]+"\n".join(base+line for line in asset_body)+"\n"+s[m.end():]
 
 
-# 5.2.8: normalize asset aliases so "tree_01", "tree 1", and
-# "tree1.png" resolve to the same embedded resource key.
-asset_key_re = re.compile(
-    r"(?ms)^[ \t]*def asset_key\(self,name\):\r?\n.*?(?=^[ \t]*def place_asset\(self,name\):)"
-)
-m = asset_key_re.search(s)
-if not m:
+# 5.2.8: normalize asset aliases without depending on method order.
+source_lines = s.splitlines(keepends=True)
+method_index = next((i for i,line in enumerate(source_lines) if re.match(r"^[ \t]*def asset_key\(self,name\):",line)),None)
+if method_index is None:
     raise RuntimeError("Could not locate asset_key()")
-base = re.match(r"^([ \t]*)",m.group(0)).group(1)
+method_indent = len(source_lines[method_index]) - len(source_lines[method_index].lstrip(" \t"))
+end_index = method_index + 1
+while end_index < len(source_lines):
+    line = source_lines[end_index]
+    stripped = line.lstrip(" \t")
+    indent = len(line) - len(stripped)
+    if stripped.strip() and indent == method_indent and (stripped.startswith("def ") or stripped.startswith("class ")):
+        break
+    end_index += 1
+base = " " * method_indent
 asset_key_body = [
     "def asset_key(self,name):",
     "    def normalize(value):",
@@ -345,7 +351,8 @@ asset_key_body = [
     "        if normalize(key)==target:return key",
     "    return None",
 ]
-s=s[:m.start()]+"\n".join(base+line for line in asset_key_body)+"\n"+s[m.end():]
+source_lines[method_index:end_index] = [(base+line+"\n") for line in asset_key_body]
+s = "".join(source_lines)
 
 tree=ast.parse(s,filename=str(p))
 app=next((n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='App'),None)
