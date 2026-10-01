@@ -103,10 +103,10 @@ if not m:
 s = s[:m.start()] + render_patch + s[m.end():]
 
 
-old_bbox_kind = "        if o.get('kind') in ('river','road'):\\n"
+old_bbox_kind = "        if o.get('kind') in ('river','road'):\n"
 if old_bbox_kind not in s:
     raise RuntimeError("terrain bounding-box insertion point missing")
-s = s.replace(old_bbox_kind, "        if o.get('kind') in ('river','road','terrain'):\\n", 1)
+s = s.replace(old_bbox_kind, "        if o.get('kind') in ('river','road','terrain'):\n", 1)
 
 insert_before = "    def draw_line_obj(self,o):\n"
 terrain_methods = """    def _draw_ground_texture(self,w,h):
