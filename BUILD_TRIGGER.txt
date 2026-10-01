@@ -1,2 +1,2 @@
-5.9.8 release - roads and rivers restored to v5.8.0 renderer
-Build trigger: 2026-10-01T15:40:00+03:00
+5.9.8 - restore roads and rivers to the exact v5.8.0 union renderer
+Build trigger: 2026-10-01T17:15:00+03:00
