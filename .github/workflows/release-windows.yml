@@ -67,6 +67,9 @@ jobs:
       - name: Validate embedded sprite integrity
         run: python tools/validate_assets.py
 
+      - name: Smoke-test real Tkinter startup, renderer, and sprite decoding
+        run: python tools/smoke_test_editor.py
+
       - name: Build editor
         working-directory: editor
         run: pyinstaller --noconfirm --clean --onedir --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
