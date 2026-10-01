@@ -1,2 +1,2 @@
-5.9.2 — network-wide road and river layer rendering
-Build trigger: 2026-10-01
+5.9.4 — continuous biome brush and Ctrl-drag object rotation
+Build trigger: 2026-10-01T15:25:00+03:00
