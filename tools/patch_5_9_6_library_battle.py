@@ -23,8 +23,9 @@ once("from tkinter import ttk, filedialog, messagebox",
 once("        self._render_pending=False;self._render_after=None;self._render_revision=0\n",
 """        self._render_pending=False;self._render_after=None;self._render_revision=0
         # MB_FEATURES_5_9_6: persistent custom sprite library, kept across app updates.
-        self.custom_sprite_dir = Path(os.environ.get('APPDATA', str(Path.home()))) / 'MedievalBattlefieldEditor' / 'Sprites'
-        self.custom_sprite_dir.mkdir(parents=True, exist_ok=True)
+        self.user_asset_dir = Path(os.environ.get('APPDATA', str(Path.home()))) / 'MedievalBattlefieldEditor' / 'Sprites'
+        self.user_asset_dir.mkdir(parents=True, exist_ok=True)
+        self.custom_sprite_dir = self.user_asset_dir
         self.custom_sprite_meta_path = self.custom_sprite_dir / 'library.json'
         try:self.custom_sprite_meta=json.loads(self.custom_sprite_meta_path.read_text(encoding='utf-8'))
         except Exception:self.custom_sprite_meta={}
@@ -66,18 +67,30 @@ replacement = """        # MB_FEATURES_5_9_6: compact category tabs instead of a
 s = s[:start] + replacement + s[end:]
 
 # Scrollable object library and controls for import/export packs.
-once("""        self.palette_canvas=tk.Canvas(self.palette,height=260,highlightthickness=0);self.palette_canvas.pack(fill='x');self.palette_frame=ttk.Frame(self.palette_canvas);self.palette_canvas.create_window((0,0),window=self.palette_frame,anchor='nw');self.build_palette()
-""",
-"""        palette_body=ttk.Frame(self.palette);palette_body.pack(fill='both',expand=True)
-        self.palette_canvas=tk.Canvas(palette_body,height=260,highlightthickness=0)
-        palette_scroll=ttk.Scrollbar(palette_body,orient='vertical',command=self.palette_canvas.yview)
-        self.palette_canvas.configure(yscrollcommand=palette_scroll.set)
-        palette_scroll.pack(side='right',fill='y');self.palette_canvas.pack(side='left',fill='both',expand=True)
+once("""        pal_head=ttk.Frame(self.palette);pal_head.pack(fill='x')
+        ttk.Button(pal_head,text='＋ Импортировать спрайт',command=self.import_map_sprite).pack(side='left',fill='x',expand=True,padx=3,pady=3)
+        self.palette_canvas=tk.Canvas(self.palette,height=300,highlightthickness=0)
+        pal_scroll=ttk.Scrollbar(self.palette,orient='vertical',command=self.palette_canvas.yview)
+        self.palette_canvas.configure(yscrollcommand=pal_scroll.set)
+        pal_scroll.pack(side='right',fill='y');self.palette_canvas.pack(side='left',fill='both',expand=True)
         self.palette_frame=ttk.Frame(self.palette_canvas)
         self.palette_window=self.palette_canvas.create_window((0,0),window=self.palette_frame,anchor='nw')
         self.palette_frame.bind('<Configure>',lambda e:self.palette_canvas.configure(scrollregion=self.palette_canvas.bbox('all')))
         self.palette_canvas.bind('<Configure>',lambda e:self.palette_canvas.itemconfigure(self.palette_window,width=e.width))
-        self.palette_canvas.bind('<MouseWheel>',lambda e:self.palette_canvas.yview_scroll(-1 if e.delta>0 else 1,'units'))
+        self.palette_canvas.bind('<MouseWheel>',lambda e:self.palette_canvas.yview_scroll(int(-e.delta/120),'units'))
+        self.build_palette()
+""",
+"""        pal_head=ttk.Frame(self.palette);pal_head.pack(fill='x')
+        ttk.Button(pal_head,text='＋ Импортировать спрайт',command=self.import_map_sprite).pack(side='left',fill='x',expand=True,padx=3,pady=3)
+        self.palette_canvas=tk.Canvas(self.palette,height=300,highlightthickness=0)
+        pal_scroll=ttk.Scrollbar(self.palette,orient='vertical',command=self.palette_canvas.yview)
+        self.palette_canvas.configure(yscrollcommand=pal_scroll.set)
+        pal_scroll.pack(side='right',fill='y');self.palette_canvas.pack(side='left',fill='both',expand=True)
+        self.palette_frame=ttk.Frame(self.palette_canvas)
+        self.palette_window=self.palette_canvas.create_window((0,0),window=self.palette_frame,anchor='nw')
+        self.palette_frame.bind('<Configure>',lambda e:self.palette_canvas.configure(scrollregion=self.palette_canvas.bbox('all')))
+        self.palette_canvas.bind('<Configure>',lambda e:self.palette_canvas.itemconfigure(self.palette_window,width=e.width))
+        self.palette_canvas.bind('<MouseWheel>',lambda e:self.palette_canvas.yview_scroll(int(-e.delta/120),'units'))
         self.build_palette()
         sprite_buttons=ttk.Frame(self.palette);sprite_buttons.pack(fill='x',padx=3,pady=3)
         ttk.Button(sprite_buttons,text='＋ Добавить спрайты',command=self.import_sprites).pack(fill='x',pady=1)
