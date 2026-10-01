@@ -1,2 +1,2 @@
-5.5.0 release - rebuild launcher and complete Windows bundle
-Build trigger: 2026-10-01T15:00:00+03:00
+5.8.0 unified road and river network geometry rebuild
+Build trigger: 2026-10-01T16:10:00+03:00
