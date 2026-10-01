@@ -294,7 +294,7 @@ line_body=[
 ]
 s=s[:m.start()]+"\n".join(base+line for line in line_body)+"\n"+s[m.end():]
 
-asset_re = re.compile(r"(?ms)^[ \t]*def asset_pil\(self,name\):\r?\n.*?(?=^[ \t]*def place_asset\(self,name\):)")
+asset_re = re.compile(r"(?ms)^[ \t]*def asset_pil\(self,name\):\r?\n.*?(?=^[ \t]*def [A-Za-z_][A-Za-z0-9_]*\(self[,)]|\Z)")
 m=asset_re.search(s)
 if not m: raise RuntimeError("Could not locate asset_pil() for robust lookup")
 base=re.match(r"^([ \t]*)",m.group(0)).group(1)
