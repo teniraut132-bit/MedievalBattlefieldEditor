@@ -146,8 +146,12 @@ once(old,new,"generator asset choices")
 # Stable map boundary: use screen-pixel line widths so it remains visible at every zoom.
 start = s.find("    def draw_map_boundary(self):")
 if start < 0: raise RuntimeError("draw_map_boundary not found")
-end = s.find("\n    def draw_line_obj(self,o):", start)
-if end < 0: raise RuntimeError("draw_line_obj anchor after boundary not found")
+# Replace only this method. Keep adjacent methods (including draw_network_layer)
+# intact because the v5.8 road/water renderer is intentionally locked.
+next_method = re.search(r"(?m)^    def [A-Za-z_][A-Za-z0-9_]*\\(self", s[start+4:])
+if not next_method:
+    raise RuntimeError("next method after draw_map_boundary not found")
+end = start + 4 + next_method.start()
 boundary = """    def draw_map_boundary(self):
         # MB_FEATURES_6_1_0_SHARED_LIBRARY_BATTLE_UI
         world_w = int(getattr(self, 'world_w', getattr(self, 'WORLD_W', 8000)))
