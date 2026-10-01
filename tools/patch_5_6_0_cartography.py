@@ -164,9 +164,9 @@ line_method = '''    def draw_line_obj(self,o):
                                         smooth=True,capstyle='round',joinstyle='round')
 
 '''
-pattern = re.compile(r"(?ms)^([ \t]*)def draw_line_obj\(self,o.*?\):\r?\n.*?(?=^[ \t]*def draw_obj\(self,o\):)")
+pattern = re.compile(r"(?ms)^([ \t]*)def draw_line_obj\(self,o.*?\):\r?\n.*?(?=^[ \t]*def _draw_ground_texture\(self,w,h\):)")
 m = pattern.search(s)
-if not m:raise RuntimeError("Could not locate draw_line_obj()")
+if not m:raise RuntimeError("Could not locate draw_line_obj() before terrain renderer")
 base = m.group(1)
 method_lines = line_method.splitlines()
 new_method = "\n".join(base + (line[4:] if line.startswith("    ") else line) for line in method_lines) + "\n"
