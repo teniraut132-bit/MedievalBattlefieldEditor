@@ -1,2 +1,2 @@
-5.2.9 rebuild - robust sprite loading and decoding
-Build trigger: 2026-10-01T13:00:00+03:00
+5.2.9 release - robust embedded sprite loader fix
+Build trigger: 2026-10-01T13:10:00+03:00
