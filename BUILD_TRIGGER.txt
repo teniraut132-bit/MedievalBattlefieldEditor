@@ -1,2 +1,2 @@
-5.2.8 rebuild - sprite integrity validation enabled
-Build trigger: 2026-10-01T12:15:00+03:00
+5.2.8 rebuild - embedded sprite validator added
+Build trigger: 2026-10-01T12:20:00+03:00
