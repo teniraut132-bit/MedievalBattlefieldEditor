@@ -19,7 +19,7 @@ state=load(STATE,{'installed_version':'0.0.0'})
 
 def log(message):
     try:
-        with open(LOG,'a',encoding='utf-8') as f:f.write(f'[{__import__("datetime").datetime.now().isoformat(timespec="seconds")}] {message}\\n')
+        with open(LOG,'a',encoding='utf-8') as f:f.write(f'[{__import__("datetime").datetime.now().isoformat(timespec="seconds")}] {message}\n')
     except Exception:pass
 
 def vt(v):
