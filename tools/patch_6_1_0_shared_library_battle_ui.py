@@ -148,7 +148,7 @@ start = s.find("    def draw_map_boundary(self):")
 if start < 0: raise RuntimeError("draw_map_boundary not found")
 # Replace only this method. Keep adjacent methods (including draw_network_layer)
 # intact because the v5.8 road/water renderer is intentionally locked.
-next_method = re.search(r"(?m)^    def [A-Za-z_][A-Za-z0-9_]*\\(self", s[start+4:])
+next_method = re.search(r"(?m)^    def [A-Za-z_][A-Za-z0-9_]*\(self", s[start+4:])
 if not next_method:
     raise RuntimeError("next method after draw_map_boundary not found")
 end = start + 4 + next_method.start()
