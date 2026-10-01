@@ -5,19 +5,18 @@ import ast
 p = Path("editor/Medieval_Battlefield_Editor_v4.py")
 s = p.read_text(encoding="utf-8")
 
-# Final canonical renderer. Earlier road patches were intentionally made
-# independent, but the released 5.2.x builds proved too fragile when several
-# patches touched the same methods. Rebuild the complete render/road section
-# here so the packaged editor always contains the methods that render() calls.
+# 5.2.6: replace the final rendering section with a single canonical version.
+# The previous 5.2.x road patches could create visual junction circles and the
+# sprite renderer was too implicit for frozen PyInstaller builds.
 
 render_re = re.compile(
-    r"(?ms)^[ \t]*def render\(self\):\r?\n.*?(?=^[ \t]*def pts\(self,p\):)"
+    r"(?ms)^[ 	]*def render\(self\):\r?\n.*?(?=^[ 	]*def pts\(self,p\):)"
 )
 m = render_re.search(s)
 if not m:
     raise RuntimeError("Could not locate render() before pts()")
 
-base_m = re.search(r"(?m)^([ \t]*)def pts\(self,p\):", s[m.start():])
+base_m = re.search(r"(?m)^([ 	]*)def pts\(self,p\):", s[m.start():])
 if not base_m:
     raise RuntimeError("Could not determine class indentation")
 base = base_m.group(1)
@@ -29,12 +28,19 @@ render_body = [
     "    w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height())",
     "    self.canvas.create_rectangle(0,0,w,h,fill='#b8a97c',outline='',tags='background')",
     "    rect=self._visible_world_rect()",
-    "    # Road underlay closes seams before the visible road strokes.",
+    "",
+    "    # Z-order is intentional: water first, roads second. This makes a",
+    "    # road crossing a river read as one uninterrupted road, with no",
+    "    # circular junction marker and no river painted over the road.",
+    "    for o in self.objects:",
+    "        if o.get('kind')=='river' and self._bbox_visible(o,rect):",
+    "            self.draw_line_obj(o)",
     "    self.draw_road_network_underlay()",
     "    for o in self.objects:",
-    "        if o.get('kind') in ('river','road') and self._bbox_visible(o,rect):",
+    "        if o.get('kind')=='road' and self._bbox_visible(o,rect):",
     "            self.draw_line_obj(o)",
     "    self.draw_road_junctions()",
+    "",
     "    for o in self.objects:",
     "        if o.get('kind') not in ('river','road') and self._bbox_visible(o,rect):",
     "            self.draw_obj(o)",
@@ -47,7 +53,7 @@ render_body = [
 s = s[:m.start()] + "\n".join(base + line for line in render_body) + "\n" + s[m.end():]
 
 section_re = re.compile(
-    r"(?ms)^[ \t]*def pts\(self,p\):.*?(?=^[ \t]*def draw_asset\(self,o\):)"
+    r"(?ms)^[ 	]*def pts\(self,p\):.*?(?=^[ 	]*def draw_asset\(self,o\):)"
 )
 m = section_re.search(s)
 if not m:
@@ -108,6 +114,8 @@ road_body = [
     "    return None",
     "",
     "def draw_road_network_underlay(self):",
+    "    # Only the dark road foundation is drawn here. It is placed after",
+    "    # rivers, so even the foundation cannot sit visibly on top of water.",
     "    roads=[o for o in self.objects if o.get('kind')=='road']",
     "    for o in roads:",
     "        p=self.pts(o.get('points',[]));wd=o.get('width',25)*self.scale",
@@ -115,20 +123,13 @@ road_body = [
     "            self.canvas.create_line(*p,fill='#4a3b2d',width=max(5,int(wd+10*self.scale)),smooth=True,capstyle='round')",
     "",
     "def draw_road_junctions(self):",
-    "    roads=[o for o in self.objects if o.get('kind')=='road']",
-    "    for i,a in enumerate(roads):",
-    "        for b in roads[i+1:]:",
-    "            radius=max(4,(a.get('width',25)+b.get('width',25))*0.55*self.scale)",
-    "            for sa,sb in self.line_segments(a):",
-    "                for sc,sd in self.line_segments(b):",
-    "                    q=self.seg_intersection(sa,sb,sc,sd)",
-    "                    if not q:continue",
-    "                    x,y=self.world_to_screen(*q)",
-    "                    self.canvas.create_oval(x-radius,y-radius,x+radius,y+radius,fill='#9b8567',outline='')",
+    "    # Deliberately no circle/point is painted at intersections.",
+    "    # Roads are already drawn in full width over the river and over other",
+    "    # roads, so the crossing itself is a normal piece of road.",
+    "    return",
     "",
-    "# Compatibility alias for older patched calls.",
     "def draw_junctions(self):",
-    "    self.draw_road_junctions()",
+    "    return self.draw_road_junctions()",
     "",
     "def draw_obj(self,o):",
     "    if o['kind']=='bridge':",
@@ -147,14 +148,99 @@ road_body = [
 ]
 s = s[:m.start()] + "\n".join(base + line for line in road_body) + "\n" + s[m.end():]
 
+# Replace the sprite renderer with a frozen-build-safe implementation.
+asset_re = re.compile(
+    r"(?ms)^[ 	]*def draw_asset\(self,o\):\r?\n.*?(?=^[ 	]*def draw_unit\(self,u\):)"
+)
+m = asset_re.search(s)
+if not m:
+    raise RuntimeError("Could not locate draw_asset()")
+
+asset_body = [
+    "def draw_asset(self,o):",
+    "    name=o.get('asset')",
+    "    if not name:return",
+    "    im=self.asset_pil(name)",
+    "    if im is None:",
+    "        # Never silently lose an object: draw a visible placeholder.",
+    "        x,y=self.world_to_screen(o.get('x',0),o.get('y',0));r=max(8,o.get('size',100)*self.scale*.35)",
+    "        self.canvas.create_oval(x-r,y-r,x+r,y+r,fill='#8d3f2f',outline='#2c2118',width=2,tags=('obj',o.get('id','')))",
+    "        self.canvas.create_text(x,y,text='?',fill='white',font=('Arial',max(8,int(10*self.scale)),'bold'))",
+    "        return",
+    "    x,y=self.world_to_screen(o.get('x',0),o.get('y',0))",
+    "    target=max(12,min(1400,int(o.get('size',100)*self.scale)))",
+    "    key=(name,target)",
+    "    photo=self.sprite_cache.get(key)",
+    "    if photo is None:",
+    "        ratio=min(target/im.width,target/im.height)",
+    "        res=im.resize((max(1,int(im.width*ratio)),max(1,int(im.height*ratio))),Image.Resampling.LANCZOS)",
+    "        photo=ImageTk.PhotoImage(res,master=self.root)",
+    "        self.sprite_cache[key]=photo",
+    "        self.tkimg[key]=photo",
+    "    self.canvas.create_image(x,y,image=photo,anchor='center',tags=('obj',o.get('id','')))",
+]
+s = s[:m.start()] + "\n".join(base + line for line in asset_body) + "\n" + s[m.end():]
+
+# Make asset loading deterministic and validate all embedded sprites.
+asset_pil_re = re.compile(
+    r"(?ms)^[ 	]*def asset_pil\(self,name\):\r?\n.*?(?=^[ 	]*def place_asset\(self,name\):)"
+)
+m = asset_pil_re.search(s)
+if not m:
+    raise RuntimeError("Could not locate asset_pil()")
+
+asset_pil_body = [
+    "def asset_pil(self,name):",
+    "    if name in self.asset_pil_cache:return self.asset_pil_cache[name]",
+    "    key=self.asset_key(name)",
+    "    if not key:return None",
+    "    try:",
+    "        raw=__import__('base64').b64decode(ASSETS[key])",
+    "        im=Image.open(io.BytesIO(raw)).convert('RGBA')",
+    "        if im.width<2 or im.height<2:return None",
+    "        self.asset_pil_cache[name]=im",
+    "        return im",
+    "    except Exception:",
+    "        return None",
+]
+s = s[:m.start()] + "\n".join(base + line for line in asset_pil_body) + "\n" + s[m.end():]
+
+# Give palette buttons a tiny thumbnail when possible. This also exercises the
+# exact same embedded sprite path used by the map renderer.
+palette_re = re.compile(
+    r"(?ms)^[ 	]*def build_palette\(self\):\r?\n.*?(?=^[ 	]*def asset_key\(self,name\):)"
+)
+m = palette_re.search(s)
+if not m:
+    raise RuntimeError("Could not locate build_palette()")
+
+palette_body = [
+    "def build_palette(self):",
+    "    for w in self.palette_frame.winfo_children():w.destroy()",
+    "    self.palette_imgs={}",
+    "    cats=[('Здания',['house_wood_01','house_wood_02','house_stone_01','house_stone_02','tower_01','keep_01','church_01','gate_01','mill_01','barn_01','barn_02']),('Природа',['tree_01','tree_02','tree_03','rock_01','rock_02','rock_03','field_01','field_02','field_03','bush_01','bush_02','bush_03']),('Декор',['wagon_01','hay_01'])]",
+    "    for title,names in cats:",
+    "        ttk.Label(self.palette_frame,text=title,font=('Arial',10,'bold')).pack(anchor='w',padx=4,pady=(4,1))",
+    "        row=ttk.Frame(self.palette_frame);row.pack(fill='x')",
+    "        for name in names:",
+    "            if self.asset_key(name) is None:continue",
+    "            im=self.asset_pil(name)",
+    "            photo=None",
+    "            if im is not None:",
+    "                thumb=im.copy();thumb.thumbnail((46,34),Image.Resampling.LANCZOS)",
+    "                photo=ImageTk.PhotoImage(thumb,master=self.root);self.palette_imgs[name]=photo",
+    "            b=ttk.Button(row,text=name.replace('_',' ').replace('01','1').replace('02','2').replace('03','3'),image=photo,compound='top' if photo else 'none',command=lambda n=name:self.place_asset(n))",
+    "            b.pack(side='left',padx=2,pady=2)",
+]
+s = s[:m.start()] + "\n".join(base + line for line in palette_body) + "\n" + s[m.end():]
+
 tree=ast.parse(s,filename=str(p))
 app=next((n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='App'),None)
-if app is None: raise RuntimeError("App class not found")
+if app is None:raise RuntimeError("App class not found")
 methods={n.name for n in app.body if isinstance(n,ast.FunctionDef)}
-required={'render','draw_line_obj','line_segments','closest_on_seg','snap_line_endpoints','seg_intersection','draw_road_network_underlay','draw_road_junctions','draw_junctions','draw_obj','draw_asset'}
+required={'render','draw_line_obj','line_segments','closest_on_seg','snap_line_endpoints','seg_intersection','draw_road_network_underlay','draw_road_junctions','draw_junctions','draw_obj','draw_asset','asset_pil','build_palette'}
 missing=required-methods
-if missing: raise RuntimeError("Missing App methods after repair: "+", ".join(sorted(missing)))
-
+if missing:raise RuntimeError("Missing App methods: "+", ".join(sorted(missing)))
 p.write_text(s,encoding='utf-8')
 compile(s,str(p),'exec')
-print("Final renderer repair passed syntax and App-method validation")
+print("5.2.6 renderer/sprite repair passed syntax and App-method validation")
