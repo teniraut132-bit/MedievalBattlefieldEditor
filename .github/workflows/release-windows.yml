@@ -11,7 +11,7 @@ on:
       version:
         description: 'Release version, for example 5.4.0'
         required: true
-        default: '5.6.0'
+        default: '5.7.0'
 
 permissions:
   contents: write
@@ -58,6 +58,9 @@ jobs:
 
       - name: Apply 5.6.0 smooth cartography and scrollable sprite library
         run: python tools/patch_5_6_0_cartography.py
+
+      - name: Apply 5.7.0 object scaling and rendering optimization
+        run: python tools/patch_5_7_0_scaling_optimization.py
 
       - name: Validate editor and launcher Python syntax
         run: |
@@ -107,7 +110,7 @@ jobs:
       - name: Create launcher release metadata
         shell: pwsh
         run: |
-          $notes = "Релиз $env:RELEASE_VERSION`n`nПлавные соединения дорог и рек без круглых маркеров; прокручиваемая библиотека спрайтов; импорт пользовательских PNG/WebP/JPG."
+          $notes = "Релиз $env:RELEASE_VERSION`n`nПлавные соединения дорог и рек; масштабирование объектов 10–500%; оптимизация отрисовки при приближении; текстуры биомов и импорт пользовательских спрайтов."
           $sha = (Get-FileHash 'MedievalBattlefieldEditor-Windows-x64.zip' -Algorithm SHA256).Hash
           $meta = @{ version=$env:RELEASE_VERSION; name='Medieval Battlefield Editor'; notes=$notes; asset_url="https://github.com/${{ github.repository }}/releases/latest/download/MedievalBattlefieldEditor-Windows-x64.zip"; sha256=$sha } | ConvertTo-Json
           $meta | Set-Content 'latest.json' -Encoding utf8
