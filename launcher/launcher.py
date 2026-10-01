@@ -1,10 +1,10 @@
-import json, shutil, subprocess, tempfile, threading, urllib.request, zipfile, hashlib
+import json, shutil, subprocess, tempfile, threading, urllib.request, zipfile, hashlib, sys, traceback
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-ROOT=Path(__file__).resolve().parent
-INSTALL=ROOT/'editor'; BACKUPS=ROOT/'backups'; CFG=ROOT/'launcher_config.json'; STATE=ROOT/'state.json'
+ROOT=Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
+INSTALL=ROOT/'editor'; BACKUPS=ROOT/'backups'; CFG=ROOT/'launcher_config.json'; STATE=ROOT/'state.json'; LOG=ROOT/'launcher.log'
 DEFAULT={'github_owner':'teniraut132-bit','github_repo':'MedievalBattlefieldEditor','asset_name':'MedievalBattlefieldEditor-Windows-x64.zip','auto_check':True,'news_file':'news.json','news_branch':'main'}
 
 def load(p,d):
@@ -17,13 +17,25 @@ cfg=load(CFG,DEFAULT)
 for k,v in DEFAULT.items():cfg.setdefault(k,v)
 state=load(STATE,{'installed_version':'0.0.0'})
 
+def log(message):
+    try:
+        with open(LOG,'a',encoding='utf-8') as f:f.write(f'[{__import__("datetime").datetime.now().isoformat(timespec="seconds")}] {message}\\n')
+    except Exception:pass
+
 def vt(v):
     try:
         p=[int(x) for x in str(v).lstrip('vV').split('.')]
         return tuple((p+[0,0,0])[:3])
     except:return (0,0,0)
 
-def ver():return load(INSTALL/'version.json',{}).get('version',state['installed_version'])
+def ver():
+    # Read the bundled editor manifest, or the legacy layout beside the launcher.
+    for folder in (INSTALL, ROOT):
+        manifest=folder/'version.json'
+        if manifest.is_file():
+            value=load(manifest,{}).get('version')
+            if value:return str(value)
+    return str(state.get('installed_version') or '0.0.0')
 
 def get_json(url):
     r=urllib.request.Request(url,headers={
@@ -38,34 +50,40 @@ def get_text(url):
     with urllib.request.urlopen(r,timeout=20) as x:return x.read().decode('utf-8-sig')
 
 def latest():
-    # Prefer the API, but GitHub limits unauthenticated requests. If the API
-    # returns HTTP 403/429, fall back to the release's direct latest.json asset.
+    # Prefer the static release manifest; it does not consume GitHub API quota.
+    direct=f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/latest.json"
+    direct_error=None
+    try:
+        meta=get_json(direct)
+        version=str(meta.get('version','')).lstrip('vV')
+        asset_url=meta.get('asset_url') or f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/{cfg['asset_name']}"
+        if not version or not asset_url:raise RuntimeError('latest.json does not contain version/asset_url')
+        return {
+            'tag_name':'v'+version,
+            'name':meta.get('name','Medieval Battlefield Editor'),
+            'body':meta.get('notes',''),
+            'html_url':f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest",
+            'assets':[{'name':cfg['asset_name'],'browser_download_url':asset_url,'digest':'sha256:'+str(meta.get('sha256','')) if meta.get('sha256') else None}]
+        }
+    except Exception as e:
+        direct_error=e
     api=f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest"
     try:
         return get_json(api)
     except Exception as api_error:
-        direct=f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/latest.json"
-        try:
-            meta=get_json(direct)
-            version=str(meta.get('version','')).lstrip('vV')
-            asset_url=meta.get('asset_url') or f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/{cfg['asset_name']}"
-            if not version or not asset_url: raise RuntimeError('latest.json does not contain version/asset_url')
-            return {
-                'tag_name':'v'+version,
-                'name':meta.get('name','Medieval Battlefield Editor'),
-                'body':meta.get('notes',''),
-                'html_url':f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest",
-                'assets':[{'name':cfg['asset_name'],'browser_download_url':asset_url,'digest':'sha256:'+str(meta.get('sha256','')) if meta.get('sha256') else None}]
-            }
-        except Exception as fallback_error:
-            raise RuntimeError(f'Не удалось проверить обновления через GitHub API и резервный канал. API: {api_error}; резервный канал: {fallback_error}') from fallback_error
+        raise RuntimeError(f"Не удалось проверить обновления. Манифест: {direct_error}; GitHub API: {api_error}") from api_error
 
 def load_news():
+    # Raw GitHub avoids the rate-limited contents API.
     try:
-        d=get_json(f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/contents/{cfg.get('news_file','news.json')}?ref={cfg.get('news_branch','main')}")
-        import base64
-        return json.loads(base64.b64decode(d['content']).decode('utf-8-sig')).get('news',[])
-    except:return []
+        branch=cfg.get('news_branch','main')
+        path=cfg.get('news_file','news.json').lstrip('/')
+        url=f"https://raw.githubusercontent.com/{cfg['github_owner']}/{cfg['github_repo']}/{branch}/{path}"
+        data=get_json(url)
+        return data.get('news',[]) if isinstance(data,dict) else []
+    except Exception as e:
+        log(f"News unavailable: {e}")
+        return []
 
 def sha(p):
     h=hashlib.sha256()
@@ -93,6 +111,9 @@ def findexe(p):
 
 def find_manifest(p):
     return findfile(p,'version.json')
+
+def installed_exe():
+    return findexe(INSTALL) or findexe(ROOT)
 
 def set_text(w,s):
     w.configure(state='normal');w.delete('1.0','end');w.insert('1.0',s);w.configure(state='disabled')
@@ -168,10 +189,11 @@ def update():
         if INSTALL.exists():INSTALL.rename(olddir)
         new.rename(INSTALL);shutil.rmtree(olddir,ignore_errors=True)
 
-        state['installed_version']=tag;save(STATE,state);vervar.set('Версия: '+ver())
+        state['installed_version']=tag;save(STATE,state);vervar.set('Версия: '+ver());log(f'Installed editor version {tag} into {INSTALL}')
         status.set(f'Установлена версия {tag}.')
         shutil.rmtree(tmp,ignore_errors=True);refresh_info(rel);return True
     except Exception as e:
+        log(f'Update failed: {traceback.format_exc()}')
         if tmp:shutil.rmtree(tmp,ignore_errors=True)
         status.set('Ошибка обновления')
         messagebox.showerror('Обновление',str(e))
@@ -181,20 +203,33 @@ def threaded():threading.Thread(target=update,daemon=True).start()
 
 def launch():
     def worker():
-        ok=True
+        current=installed_exe()
         try:
             rel=latest()
-            if vt(rel.get('tag_name','0'))>vt(ver()) or not findexe(INSTALL):
-                ok=update()
-        except Exception:
-            ok=False
-        e=findexe(INSTALL)
-        if ok and e:
-            # Run from the actual executable directory; PyInstaller onedir
-            # apps may rely on adjacent _internal/data files.
-            root.after(0,lambda:(subprocess.Popen([str(e)],cwd=str(e.parent)),root.destroy()))
-        elif ok:
-            root.after(0,lambda:messagebox.showerror('Редактор','Редактор не установлен. Нажмите «Проверить обновления».'))
+            latest_version=str(rel.get('tag_name','0')).lstrip('vV')
+            if not current or vt(latest_version)>vt(ver()):
+                updated=update()
+                current=installed_exe()
+                if not updated and current:
+                    log('Update failed; launching installed editor as fallback.')
+        except Exception as exc:
+            log(f'Update check failed: {exc}')
+            current=installed_exe()
+            if current:
+                status_text=f'Проверка обновлений недоступна; запускаю установленную версию {ver()}.'
+                root.after(0,lambda t=status_text:status.set(t))
+        if current and current.is_file():
+            log(f'Launching executable={current}; cwd={current.parent}; version={ver()}')
+            def start_editor():
+                try:
+                    subprocess.Popen([str(current)],cwd=str(current.parent))
+                    root.destroy()
+                except Exception as exc:
+                    log(f'Launch failed: {traceback.format_exc()}')
+                    messagebox.showerror('Запуск редактора',f'Не удалось запустить редактор: {exc}\n\nЖурнал: {LOG}')
+            root.after(0,start_editor)
+        else:
+            root.after(0,lambda:messagebox.showerror('Редактор',f'Не найден MedievalBattlefieldEditor.exe. Проверьте папку editor рядом с лаунчером.\nЖурнал: {LOG}'))
     threading.Thread(target=worker,daemon=True).start()
 
 def settings():
