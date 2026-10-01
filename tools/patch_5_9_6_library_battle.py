@@ -211,15 +211,9 @@ build_palette = """    # MB_FEATURES_5_9_6
 s = s[:m.start()] + build_palette + s[m.end():]
 
 # Custom asset loading is disk-backed and cached, never bundled into the executable.
-once("""    def asset_pil(self,name):
-        if name in self.asset_pil_cache:
-            return self.asset_pil_cache[name]
-        key=self.asset_key(name)
+once("""        key=self.asset_key(name)
 """,
-"""    def asset_pil(self,name):
-        if name in self.asset_pil_cache:
-            return self.asset_pil_cache[name]
-        if name.startswith('user__'):
+"""        if isinstance(name,str) and name.startswith('user__'):
             stem=name[6:]
             candidates=[q for q in self.custom_sprite_dir.glob(stem+'.*') if q.suffix.lower() in ('.png','.webp','.jpg','.jpeg','.bmp','.gif')]
             if candidates:
