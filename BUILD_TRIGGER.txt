@@ -1,2 +1,2 @@
-5.2.6 rebuild - sprite renderer and continuous road crossings
-Build trigger: 2026-10-01T10:55:00+03:00
+5.2.7 rebuild - normalized sprites and seamless layered line networks
+Build trigger: 2026-10-01T11:20:00+03:00
