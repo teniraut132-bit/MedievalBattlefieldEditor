@@ -48,6 +48,7 @@ jobs:
         run: |
           python tools/patch_5_6_0_cartography.py
           python tools/optimize_5_9_0.py
+          python tools/patch_5_9_3_landscape.py
 
       - name: Validate source and patch scripts
         shell: pwsh
