@@ -1,2 +1,2 @@
-5.9.7 — fix sprite import callback crash; retain all 5.9.6 features. Roads and rivers unchanged.
-Build trigger: 2026-10-01T16:50:00+03:00
+5.9.8 release - roads and rivers restored to v5.8.0 renderer
+Build trigger: 2026-10-01T15:40:00+03:00
