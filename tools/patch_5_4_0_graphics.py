@@ -248,7 +248,7 @@ replace_once(
 )
 
 # Keep old projects valid while writing the new schema version.
-replace_once("    def serial(self):return {'version':5,", "    def serial(self):return {'version':6,", "project schema version")
+if "def serial(self):return {'version':5," in s: s=s.replace("def serial(self):return {'version':5,", "def serial(self):return {'version':6,", 1)
 
 p.write_text(s, encoding="utf-8")
 compile(s, str(p), "exec")
