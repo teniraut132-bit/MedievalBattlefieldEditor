@@ -2,50 +2,83 @@ import json, shutil, subprocess, tempfile, threading, urllib.request, zipfile, h
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
+
 ROOT=Path(__file__).resolve().parent
 INSTALL=ROOT/'editor'; BACKUPS=ROOT/'backups'; CFG=ROOT/'launcher_config.json'; STATE=ROOT/'state.json'
 DEFAULT={'github_owner':'teniraut132-bit','github_repo':'MedievalBattlefieldEditor','asset_name':'MedievalBattlefieldEditor-Windows-x64.zip','auto_check':True,'news_file':'news.json','news_branch':'main'}
+
 def load(p,d):
     try:return json.loads(p.read_text(encoding='utf-8'))
     except:return d.copy()
+
 def save(p,d):p.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding='utf-8')
+
 cfg=load(CFG,DEFAULT)
 for k,v in DEFAULT.items():cfg.setdefault(k,v)
 state=load(STATE,{'installed_version':'0.0.0'})
+
 def vt(v):
     try:
-        p=[int(x) for x in str(v).lstrip('vV').split('.')];return tuple((p+[0,0,0])[:3])
+        p=[int(x) for x in str(v).lstrip('vV').split('.')]
+        return tuple((p+[0,0,0])[:3])
     except:return (0,0,0)
+
 def ver():return load(INSTALL/'version.json',{}).get('version',state['installed_version'])
-def raw(path,branch='main'):
-    return f"https://raw.githubusercontent.com/{cfg['github_owner']}/{cfg['github_repo']}/{branch}/{path}"
+
+def get_json(url):
+    r=urllib.request.Request(url,headers={
+        'User-Agent':'MedievalBattlefieldLauncher/5.2.2',
+        'Accept':'application/vnd.github+json'
+    })
+    with urllib.request.urlopen(r,timeout=30) as x:
+        return json.loads(x.read().decode('utf-8-sig'))
+
 def get_text(url):
-    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher'})
-    with urllib.request.urlopen(r,timeout=20) as x:return x.read().decode('utf-8')
+    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/5.2.2'})
+    with urllib.request.urlopen(r,timeout=20) as x:return x.read().decode('utf-8-sig')
+
 def latest():
-    return json.loads(get_text(f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/latest.json"))
+    # Use the GitHub Releases API directly. This avoids relying on a
+    # separate latest.json redirect/download endpoint.
+    return get_json(f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest")
+
 def load_news():
     try:
-        d=json.loads(get_text(f"https://raw.githubusercontent.com/{cfg['github_owner']}/{cfg['github_repo']}/{cfg.get('news_branch','main')}/{cfg.get('news_file','news.json')}"))
-        return d.get('news',[]) if isinstance(d,dict) else []
+        d=get_json(f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/contents/{cfg.get('news_file','news.json')}?ref={cfg.get('news_branch','main')}")
+        import base64
+        return json.loads(base64.b64decode(d['content']).decode('utf-8-sig')).get('news',[])
     except:return []
+
 def sha(p):
     h=hashlib.sha256()
     with open(p,'rb') as f:
         for b in iter(lambda:f.read(1024*1024),b''):h.update(b)
     return h.hexdigest()
+
+def findfile(root,name):
+    direct=root/name
+    if direct.exists():return direct
+    hits=list(root.rglob(name))
+    return hits[0] if hits else None
+
 def findexe(p):
     for n in ['MedievalBattlefieldEditor.exe','Medieval_Battlefield_Editor_v4.exe']:
-        if (p/n).exists():return p/n
+        e=findfile(p,n)
+        if e:return e
+
+def find_manifest(p):
+    return findfile(p,'version.json')
+
 def set_text(w,s):
     w.configure(state='normal');w.delete('1.0','end');w.insert('1.0',s);w.configure(state='disabled')
+
 def refresh_info(rel=None):
     if rel is None:
-        try:rel=next((r for r in get(api()) if not r.get('draft') and not r.get('prerelease')),None)
+        try:rel=latest()
         except Exception:rel=None
     lines=[]
     if rel:
-        lines.append(f"Версия {rel['tag_name'].lstrip('vV')} — {rel.get('name','')}")
+        lines.append(f"Версия {str(rel.get('tag_name','')).lstrip('vV')} — {rel.get('name','')}")
         for line in (rel.get('body') or '').splitlines():
             line=line.strip().lstrip('-*').strip()
             if line and 'Full Changelog' not in line:lines.append(line)
@@ -54,44 +87,81 @@ def refresh_info(rel=None):
     for n in news[:12]:
         nl.append(f"• {n.get('date','')}  {n.get('title','')}" if isinstance(n,dict) else '• '+str(n))
     set_text(news_box,'\n'.join(nl) if nl else 'Пока нет новостей проекта.')
+
 def update():
+    tmp=None
     try:
         status.set('Проверка обновлений…')
-        rel=latest();tag=str(rel['version']).lstrip('vV')
+        rel=latest()
+        tag=str(rel.get('tag_name','')).lstrip('vV')
+        if not tag:raise RuntimeError('GitHub не вернул номер версии релиза')
         if vt(tag)<=vt(ver()):
             status.set(f'Версия {ver()} уже актуальна.');refresh_info(rel);return True
-        url=rel.get('asset_url') or f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/{cfg['asset_name']}"
+
+        assets=rel.get('assets') or []
+        asset=next((a for a in assets if a.get('name')==cfg['asset_name']),None)
+        if not asset:
+            names=', '.join(a.get('name','?') for a in assets)
+            raise RuntimeError(f'В релизе {tag} нет файла {cfg["asset_name"]}. Найдены: {names or "нет файлов"}')
+        url=asset.get('browser_download_url')
+        if not url:raise RuntimeError('У ZIP-релиза отсутствует ссылка на скачивание')
+
         tmp=Path(tempfile.mkdtemp(prefix='MBE_update_'));z=tmp/'release.zip'
         status.set(f'Скачивание {tag}…')
-        req=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher'})
-        with urllib.request.urlopen(req,timeout=180) as r,open(z,'wb') as f:shutil.copyfileobj(r,f)
-        if rel.get('sha256') and sha(z).lower()!=rel['sha256'].lower():raise RuntimeError('SHA-256 проверка не пройдена')
-        st=tmp/'staging';st.mkdir();zipfile.ZipFile(z).extractall(st)
-        if not (st/'version.json').exists():
-            ds=[d for d in st.iterdir() if d.is_dir()]
-            if len(ds)==1:st=ds[0]
-        if load(st/'version.json',{}).get('version')!=tag or not findexe(st):raise RuntimeError('Некорректный пакет редактора')
+        req=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/5.2.2','Accept':'application/octet-stream'})
+        with urllib.request.urlopen(req,timeout=300) as r,open(z,'wb') as f:shutil.copyfileobj(r,f)
+
+        expected=asset.get('digest')
+        if expected and expected.startswith('sha256:'):expected=expected.split(':',1)[1]
+        if expected and sha(z).lower()!=expected.lower():raise RuntimeError('SHA-256 проверка GitHub не пройдена')
+
+        st=tmp/'staging';st.mkdir()
+        with zipfile.ZipFile(z) as zf:
+            bad=zf.testzip()
+            if bad:raise RuntimeError(f'Повреждённый ZIP, файл: {bad}')
+            zf.extractall(st)
+
+        manifest=find_manifest(st)
+        editor=findexe(st)
+        if not manifest or not editor:
+            entries=', '.join(p.name for p in st.iterdir())
+            raise RuntimeError(f'Некорректный пакет редактора: не найден version.json или MedievalBattlefieldEditor.exe. Содержимое ZIP: {entries or "пусто"}')
+        downloaded_version=load(manifest,{}).get('version')
+        if downloaded_version!=tag:
+            raise RuntimeError(f'Версия пакета ({downloaded_version}) не совпадает с релизом ({tag})')
+
+        # Normalize a possible single top-level directory so installed editor
+        # remains a clean folder.
+        package_root=manifest.parent
         BACKUPS.mkdir(exist_ok=True);old=ver()
         if INSTALL.exists():shutil.copytree(INSTALL,BACKUPS/old,dirs_exist_ok=True)
+
         new=ROOT/'editor_new';olddir=ROOT/'editor_old'
         if new.exists():shutil.rmtree(new)
         if olddir.exists():shutil.rmtree(olddir)
-        shutil.copytree(st,new)
+        shutil.copytree(package_root,new)
         if INSTALL.exists():INSTALL.rename(olddir)
         new.rename(INSTALL);shutil.rmtree(olddir,ignore_errors=True)
-        state['installed_version']=tag;save(STATE,state);vervar.set('Версия: '+ver());status.set(f'Установлена версия {tag}.')
+
+        state['installed_version']=tag;save(STATE,state);vervar.set('Версия: '+ver())
+        status.set(f'Установлена версия {tag}.')
         shutil.rmtree(tmp,ignore_errors=True);refresh_info(rel);return True
     except Exception as e:
-        status.set('Ошибка обновления');messagebox.showerror('Обновление',str(e));return False
+        if tmp:shutil.rmtree(tmp,ignore_errors=True)
+        status.set('Ошибка обновления')
+        messagebox.showerror('Обновление',str(e))
+        return False
+
 def threaded():threading.Thread(target=update,daemon=True).start()
+
 def launch():
     def worker():
         ok=True
         try:
             rel=latest()
-            if vt(rel.get('version','0'))>vt(ver()) or not findexe(INSTALL):
+            if vt(rel.get('tag_name','0'))>vt(ver()) or not findexe(INSTALL):
                 ok=update()
-        except Exception as e:
+        except Exception:
             ok=False
         e=findexe(INSTALL)
         if ok and e:
@@ -99,6 +169,7 @@ def launch():
         elif ok:
             root.after(0,lambda:messagebox.showerror('Редактор','Редактор не установлен. Нажмите «Проверить обновления».'))
     threading.Thread(target=worker,daemon=True).start()
+
 def settings():
     w=tk.Toplevel(root);w.title('Настройки GitHub');w.geometry('520x330');vals={}
     for k,label in [('github_owner','GitHub owner'),('github_repo','Repository'),('asset_name','ZIP asset'),('news_file','Файл новостей'),('news_branch','Ветка новостей')]:
@@ -106,6 +177,7 @@ def settings():
         v=tk.StringVar(value=cfg[k]);vals[k]=v;tk.Entry(w,textvariable=v).pack(fill='x',padx=18)
     def s():cfg.update({k:v.get().strip() for k,v in vals.items()});save(CFG,cfg);w.destroy();refresh_info();status.set('Настройки сохранены')
     tk.Button(w,text='Сохранить',command=s).pack(pady=18)
+
 root=tk.Tk();root.title('Medieval Battlefield Editor — Launcher');root.geometry('980x650');root.minsize(820,560);root.configure(bg='#0e0d0b')
 header=tk.Frame(root,bg='#17130e');header.pack(fill='x')
 tk.Label(header,text='MEDIEVAL BATTLEFIELD EDITOR',bg='#17130e',fg='#d6b45e',font=('Georgia',25,'bold')).pack(pady=(24,4))
