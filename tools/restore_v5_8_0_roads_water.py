@@ -9,7 +9,7 @@ if marker in s:
 
 # Keep every post-5.8 feature intact. Replace only the way roads and rivers are
 # rasterized: one union mask per network, exactly as the stable 5.8.0 renderer.
-method = String.raw'''    def draw_network_layer(self, kind, rect=None):
+method = """    def draw_network_layer(self, kind, rect=None):
         # MB_ROADS_WATER_V5_8_0
         from PIL import Image, ImageDraw
         w = max(1, self.canvas.winfo_width())
@@ -79,7 +79,7 @@ method = String.raw'''    def draw_network_layer(self, kind, rect=None):
         self._network_layer_photos[kind] = photo
         self.canvas.create_image(0, 0, image=photo, anchor='nw', tags=('network_layer', kind))
 
-'''
+"""
 anchor = "    def draw_line_obj(self,o):"
 if s.count(anchor) != 1:
     raise RuntimeError("Expected exactly one draw_line_obj()")
