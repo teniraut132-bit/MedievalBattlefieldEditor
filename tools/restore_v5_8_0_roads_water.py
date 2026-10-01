@@ -118,31 +118,37 @@ def contains_draw_line(node):
         for x in ast.walk(node)
     )
 
-targets = [
-    n for n in render_fn.body
+all_loops = [
+    n for n in ast.walk(render_fn)
     if isinstance(n, ast.For) and contains_draw_line(n)
 ]
-if not targets:
-    raise RuntimeError("No active top-level river/road drawing loop found")
+if not all_loops:
+    raise RuntimeError("No active river/road drawing loop found anywhere in the live renderer")
+
+# Keep only outermost matching loops, so a nested helper loop is not replaced twice.
+targets=[]
+for node in sorted(all_loops,key=lambda n:(n.lineno,-n.end_lineno)):
+    if not any(parent.lineno <= node.lineno and parent.end_lineno >= node.end_lineno for parent in targets):
+        targets.append(node)
 
 source_lines = s.splitlines(keepends=True)
-replacement_indent = source_lines[targets[0].lineno - 1]
+first = min(targets,key=lambda n:n.lineno)
+replacement_indent = source_lines[first.lineno - 1]
 indent = replacement_indent[:len(replacement_indent)-len(replacement_indent.lstrip())]
 replacement = (
-    indent + "# MB_ROADS_WATER_V5_8_0: one union mask per network; no segment stacking.\\n"
-    + indent + "self.draw_network_layer('river',rect)\\n"
-    + indent + "self.draw_network_layer('road',rect)\\n"
+    indent + "# MB_ROADS_WATER_V5_8_0: one union mask per network; no segment stacking.\n"
+    + indent + "self.draw_network_layer('river',rect)\n"
+    + indent + "self.draw_network_layer('road',rect)\n"
 )
 
-# Replace all matching top-level loops, inserting the union renderer once.
-for node in reversed(targets):
-    a = node.lineno - 1
-    b = node.end_lineno
-    if node is targets[0]:
-        source_lines[a:b] = [replacement]
+for node in sorted(targets,key=lambda n:n.lineno,reverse=True):
+    aa=node.lineno-1
+    bb=node.end_lineno
+    if node is first:
+        source_lines[aa:bb]=[replacement]
     else:
-        del source_lines[a:b]
-s = ''.join(source_lines)
+        del source_lines[aa:bb]
+s=''.join(source_lines)
 
 # Old circular-junction/underlay calls are incompatible with the v5.8 union renderer.
 for call in (
