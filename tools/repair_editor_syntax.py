@@ -319,6 +319,34 @@ asset_body=[
 ]
 s=s[:m.start()]+"\n".join(base+line for line in asset_body)+"\n"+s[m.end():]
 
+
+# 5.2.8: normalize asset aliases so "tree_01", "tree 1", and
+# "tree1.png" resolve to the same embedded resource key.
+asset_key_re = re.compile(
+    r"(?ms)^[ \t]*def asset_key\(self,name\):\r?\n.*?(?=^[ \t]*def place_asset\(self,name\):)"
+)
+m = asset_key_re.search(s)
+if not m:
+    raise RuntimeError("Could not locate asset_key()")
+base = re.match(r"^([ \t]*)",m.group(0)).group(1)
+asset_key_body = [
+    "def asset_key(self,name):",
+    "    def normalize(value):",
+    "        value=str(value).replace('\\\\','/').rsplit('/',1)[-1]",
+    "        if '.' in value:value=value.rsplit('.',1)[0]",
+    "        value=''.join(ch.lower() for ch in value if ch.isalnum())",
+    "        split=len(value)",
+    "        while split>0 and value[split-1].isdigit():split-=1",
+    "        prefix,digits=value[:split],value[split:]",
+    "        if digits:digits=str(int(digits))",
+    "        return prefix+digits",
+    "    target=normalize(name)",
+    "    for key in ASSETS.keys():",
+    "        if normalize(key)==target:return key",
+    "    return None",
+]
+s=s[:m.start()]+"\n".join(base+line for line in asset_key_body)+"\n"+s[m.end():]
+
 tree=ast.parse(s,filename=str(p))
 app=next((n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='App'),None)
 if app is None:raise RuntimeError("App class not found")
@@ -328,4 +356,4 @@ missing=required-methods
 if missing:raise RuntimeError("Missing App methods: "+", ".join(sorted(missing)))
 p.write_text(s,encoding='utf-8')
 compile(s,str(p),'exec')
-print("5.2.6 renderer/sprite repair passed syntax and App-method validation")
+print("5.2.8 renderer/sprite alias repair passed syntax and App-method validation")
