@@ -38,9 +38,27 @@ def get_text(url):
     with urllib.request.urlopen(r,timeout=20) as x:return x.read().decode('utf-8-sig')
 
 def latest():
-    # Use the GitHub Releases API directly. This avoids relying on a
-    # separate latest.json redirect/download endpoint.
-    return get_json(f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest")
+    # Prefer the API, but GitHub limits unauthenticated requests. If the API
+    # returns HTTP 403/429, fall back to the release's direct latest.json asset.
+    api=f"https://api.github.com/repos/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest"
+    try:
+        return get_json(api)
+    except Exception as api_error:
+        direct=f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/latest.json"
+        try:
+            meta=get_json(direct)
+            version=str(meta.get('version','')).lstrip('vV')
+            asset_url=meta.get('asset_url') or f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest/download/{cfg['asset_name']}"
+            if not version or not asset_url: raise RuntimeError('latest.json does not contain version/asset_url')
+            return {
+                'tag_name':'v'+version,
+                'name':meta.get('name','Medieval Battlefield Editor'),
+                'body':meta.get('notes',''),
+                'html_url':f"https://github.com/{cfg['github_owner']}/{cfg['github_repo']}/releases/latest",
+                'assets':[{'name':cfg['asset_name'],'browser_download_url':asset_url,'digest':'sha256:'+str(meta.get('sha256','')) if meta.get('sha256') else None}]
+            }
+        except Exception as fallback_error:
+            raise RuntimeError(f'Не удалось проверить обновления через GitHub API и резервный канал. API: {api_error}; резервный канал: {fallback_error}') from fallback_error
 
 def load_news():
     try:
@@ -62,9 +80,16 @@ def findfile(root,name):
     return hits[0] if hits else None
 
 def findexe(p):
+    # Prefer the executable at the install root. Recursive search can
+    # otherwise select an old copy from a nested folder/backup.
     for n in ['MedievalBattlefieldEditor.exe','Medieval_Battlefield_Editor_v4.exe']:
-        e=findfile(p,n)
-        if e:return e
+        e=p/n
+        if e.is_file():return e
+    for n in ['MedievalBattlefieldEditor.exe','Medieval_Battlefield_Editor_v4.exe']:
+        hits=[x for x in p.rglob(n) if x.is_file() and 'backups' not in [part.lower() for part in x.parts] and 'editor_old' not in [part.lower() for part in x.parts]]
+        if hits:
+            hits.sort(key=lambda x:(len(x.relative_to(p).parts),str(x).lower()))
+            return hits[0]
 
 def find_manifest(p):
     return findfile(p,'version.json')
@@ -165,7 +190,9 @@ def launch():
             ok=False
         e=findexe(INSTALL)
         if ok and e:
-            root.after(0,lambda:(subprocess.Popen([str(e)],cwd=str(INSTALL)),root.destroy()))
+            # Run from the actual executable directory; PyInstaller onedir
+            # apps may rely on adjacent _internal/data files.
+            root.after(0,lambda:(subprocess.Popen([str(e)],cwd=str(e.parent)),root.destroy()))
         elif ok:
             root.after(0,lambda:messagebox.showerror('Редактор','Редактор не установлен. Нажмите «Проверить обновления».'))
     threading.Thread(target=worker,daemon=True).start()
