@@ -179,7 +179,7 @@ replace_once(
     "        if self.tool in ('river','road_dirt','road_paved','road_cobble'):\n            self.snapshot();self.stroke=[(x,y)];return\n",
     """        if self.tool=='terrain':
             self.snapshot();self.stroke=[(x,y)];self.last=(x,y);return
-        if self.tool in ('river','road'):
+        if self.tool in ('river','road_dirt','road_paved','road_cobble'):
             self.snapshot();self.stroke=[(x,y)];return
 """,
     "terrain stroke start"
@@ -189,7 +189,7 @@ replace_once(
     "        elif self.tool in ('river','road_dirt','road_paved','road_cobble') and self.stroke is not None:\n            if math.hypot(x-self.stroke[-1][0],y-self.stroke[-1][1])>12:self.stroke.append((x,y));self.preview()\n",
     """        elif self.tool=='terrain' and self.stroke is not None:
             if math.hypot(x-self.stroke[-1][0],y-self.stroke[-1][1])>max(12,self.brush*.12):self.stroke.append((x,y));self.preview()
-        elif self.tool in ('river','road') and self.stroke is not None:
+        elif self.tool in ('river','road_dirt','road_paved','road_cobble') and self.stroke is not None:
             if math.hypot(x-self.stroke[-1][0],y-self.stroke[-1][1])>12:self.stroke.append((x,y));self.preview()
 """,
     "terrain stroke drag"
@@ -202,7 +202,7 @@ replace_once(
             if len(self.stroke)==1:self.stroke.append(self.stroke[0])
             self.objects.append({'id':self.oid(),'kind':'terrain','terrain':self.terrain_type,'points':self.stroke,'width':max(80,self.brush)})
             self.stroke=None;self.render();self.refresh()
-        elif self.tool in ('river','road') and self.stroke and len(self.stroke)>1:
+        elif self.tool in ('river','road_dirt','road_paved','road_cobble') and self.stroke and len(self.stroke)>1:
 """,
     "terrain stroke finish"
 )
