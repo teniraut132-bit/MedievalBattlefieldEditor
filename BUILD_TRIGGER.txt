@@ -1,2 +1,2 @@
-5.3.3 release - launcher rate limit fallback and correct executable selection
-Build trigger: 2026-10-01T18:00:00+03:00
+5.3.5 - restore deterministic ground/biome, river, and road rendering order
+Build trigger: 2026-10-01T19:10:00+03:00
