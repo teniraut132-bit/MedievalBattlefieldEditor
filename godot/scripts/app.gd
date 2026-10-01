@@ -192,6 +192,16 @@ func _build_object_tab(tabs: TabContainer) -> void:
     import_button.pressed.connect(_on_import_pressed)
     objects.add_child(import_button)
 
+    var export_pack := Button.new()
+    export_pack.text = "Экспорт общего набора"
+    export_pack.pressed.connect(_on_export_asset_pack)
+    objects.add_child(export_pack)
+
+    var import_pack := Button.new()
+    import_pack.text = "Импорт общего набора"
+    import_pack.pressed.connect(_on_import_asset_pack)
+    objects.add_child(import_pack)
+
     library_scroll = ScrollContainer.new()
     library_scroll.custom_minimum_size = Vector2(0, 720)
     library_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -303,6 +313,35 @@ func _on_import_pressed() -> void:
     dialog.files_selected.connect(func(paths: PackedStringArray):
         var count := map_renderer.assets.import_files(paths)
         status_label.text = "Импортировано спрайтов: %d. Каталог обновлён." % count
+        _refresh_library()
+        dialog.queue_free()
+    )
+    add_child(dialog)
+    dialog.popup_centered_ratio(0.75)
+
+func _on_export_asset_pack() -> void:
+    var dialog := FileDialog.new()
+    dialog.access = FileDialog.ACCESS_FILESYSTEM
+    dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+    dialog.filters = PackedStringArray(["*.zip ; Набор спрайтов"])
+    dialog.file_selected.connect(func(path: String):
+        if map_renderer.assets.export_shared_pack(path):
+            status_label.text = "Общий набор сохранён: " + path
+        else:
+            status_label.text = "Не удалось сохранить общий набор."
+        dialog.queue_free()
+    )
+    add_child(dialog)
+    dialog.popup_centered_ratio(0.75)
+
+func _on_import_asset_pack() -> void:
+    var dialog := FileDialog.new()
+    dialog.access = FileDialog.ACCESS_FILESYSTEM
+    dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+    dialog.filters = PackedStringArray(["*.zip ; Набор спрайтов"])
+    dialog.file_selected.connect(func(path: String):
+        var count := map_renderer.assets.import_shared_pack(path)
+        status_label.text = "Импортировано из набора: %d" % count
         _refresh_library()
         dialog.queue_free()
     )
