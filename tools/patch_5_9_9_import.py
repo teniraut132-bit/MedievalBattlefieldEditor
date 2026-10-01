@@ -68,11 +68,7 @@ method='''    def import_sprites(self):
 '''
 s=s[:start]+method+s[end:]
 
-# Scrollable palette: preserve the object catalogue but make it cheaper to rebuild.
-s=s.replace("        self.palette_frame.update_idletasks()
-        self.palette_canvas.configure(scrollregion=self.palette_canvas.bbox('all'))",
-            "        self.palette_frame.update_idletasks()
-        self.palette_canvas.configure(scrollregion=self.palette_canvas.bbox('all'))",1)
+# Palette refresh is already performed by build_palette(); no extra source rewrite here.
 
 s=MARK+"\n"+s
 p.write_text(s,encoding="utf-8")
