@@ -11,7 +11,7 @@ on:
       version:
         description: 'Release version, for example 5.0.0'
         required: true
-        default: '5.2.0'
+        default: '5.2.5'
 
 permissions:
   contents: write
@@ -46,6 +46,9 @@ jobs:
 
       - name: Apply 5.2.0 road-network patch
         run: python tools/patch_5_2_0.py
+
+      - name: Fix river and road layer ordering
+        run: python tools/patch_5_2_5.py
 
       - name: Repair editor syntax after patches
         run: python tools/repair_editor_syntax.py
