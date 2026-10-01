@@ -15,6 +15,11 @@ jobs:
     container:
       image: barichello/godot-ci:4.7.2
     steps:
+      - name: Install Python for legacy asset migration
+        run: |
+          apt-get update
+          apt-get install -y python3
+
       - name: Checkout
         uses: actions/checkout@v4
 
