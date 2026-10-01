@@ -1,0 +1,54 @@
+name: Build Godot GPU migration prototype
+
+on:
+  push:
+    branches:
+      - 'engine/godot-*'
+      - 'release/*'
+    paths:
+      - 'godot/**'
+      - 'tools/**'
+      - '.github/workflows/build-godot-gpu.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Godot 4.7.2
+        shell: bash
+        run: |
+          curl -L --fail --retry 3 \
+            "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip" \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          echo "GODOT_BIN=/tmp/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+
+      - name: Static project validation
+        run: |
+          "$GODOT_BIN" --headless --path godot --editor --quit
+
+      - name: Export Windows prototype
+        shell: bash
+        run: |
+          mkdir -p godot/build
+          curl -L --fail --retry 3 \
+            "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz" \
+            -o /tmp/templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          cp -r /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+          "$GODOT_BIN" --headless --path godot --export-release "Windows Desktop" godot/build/MedievalBattlefieldGPU.exe
+
+      - name: Upload prototype
+        uses: actions/upload-artifact@v4
+        with:
+          name: MedievalBattlefield-GPU-Godot-6.0.0-alpha.1
+          path: godot/build/
