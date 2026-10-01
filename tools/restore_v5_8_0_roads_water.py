@@ -1,15 +1,15 @@
 from pathlib import Path
+import ast
 
 p = Path("editor/Medieval_Battlefield_Editor_v4.py")
 s = p.read_text(encoding="utf-8")
-marker = "# MB_ROADS_WATER_V5_8_0"
-if marker in s:
-    print("5.8.0 road/water renderer already present")
+MARKER = "# MB_ROADS_WATER_V5_8_0"
+
+if MARKER in s:
+    print("5.8.0 road/river renderer already present")
     raise SystemExit(0)
 
-# Keep every post-5.8 feature intact. Replace only the way roads and rivers are
-# rasterized: one union mask per network, exactly as the stable 5.8.0 renderer.
-method = """    def draw_network_layer(self, kind, rect=None):
+NETWORK_METHOD = """    def draw_network_layer(self, kind, rect=None):
         # MB_ROADS_WATER_V5_8_0
         from PIL import Image, ImageDraw
         w = max(1, self.canvas.winfo_width())
@@ -77,34 +77,81 @@ method = """    def draw_network_layer(self, kind, rect=None):
         if not hasattr(self, '_network_layer_photos'):
             self._network_layer_photos = {}
         self._network_layer_photos[kind] = photo
-        self.canvas.create_image(0, 0, image=photo, anchor='nw', tags=('network_layer', kind))
+        self.canvas.create_image(
+            0, 0, image=photo, anchor='nw',
+            tags=('network_layer', kind)
+        )
 
 """
-anchor = "    def draw_line_obj(self,o):"
-if s.count(anchor) != 1:
-    raise RuntimeError("Expected exactly one draw_line_obj()")
-s = s.replace(anchor, method + anchor, 1)
 
-# Replace only the live river/road render loop. Biomes, objects, units, boundary
-# and all other newer features remain untouched.
-old_loop = """        for o in self.objects:
-            if o['kind'] in ('river','road') and self._bbox_visible(o,rect):
-                self.draw_line_obj(o)
-"""
-new_loop = """        # 5.8.0 road/water geometry: one union mask per network.
-        self.draw_network_layer('river',rect)
-        self.draw_network_layer('road',rect)
-"""
-if old_loop not in s:
-    raise RuntimeError("Could not find the active river/road render loop; refusing an uncertain rollback")
-s = s.replace(old_loop, new_loop, 1)
+tree = ast.parse(s, filename=str(p))
+app = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "App"), None)
+if app is None:
+    raise RuntimeError("App class not found")
 
-# The feature patches may have inserted old underlay/junction calls. Remove only
-# those calls; they are not part of the v5.8.0 union-mask renderer.
-s = s.replace("        self.draw_road_network_underlay()\n", "")
-s = s.replace("        self.draw_road_junctions()\n", "")
-s = s.replace("        self.draw_junctions()\n", "")
+draw_line = next((n for n in app.body if isinstance(n, ast.FunctionDef) and n.name == "draw_line_obj"), None)
+if draw_line is None:
+    raise RuntimeError("draw_line_obj() not found")
 
-p.write_text(s, encoding="utf-8")
+# Insert the v5.8 network union method immediately before draw_line_obj().
+lines = s.splitlines(keepends=True)
+insert_index = draw_line.lineno - 1
+lines.insert(insert_index, NETWORK_METHOD)
+s = ''.join(lines)
+
+# Reparse after insertion and locate the actual drawing function produced by
+# the 5.9 performance patch. We preserve every statement except road/river
+# per-segment loops.
+tree = ast.parse(s, filename=str(p))
+app = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "App")
+render_fn = next((n for n in app.body if isinstance(n, ast.FunctionDef) and n.name == "_render_now"), None)
+if render_fn is None:
+    render_fn = next((n for n in app.body if isinstance(n, ast.FunctionDef) and n.name == "render"), None)
+if render_fn is None:
+    raise RuntimeError("Neither _render_now() nor render() found")
+
+def contains_draw_line(node):
+    return any(
+        isinstance(x, ast.Call)
+        and isinstance(x.func, ast.Attribute)
+        and x.func.attr == "draw_line_obj"
+        for x in ast.walk(node)
+    )
+
+targets = [
+    n for n in render_fn.body
+    if isinstance(n, ast.For) and contains_draw_line(n)
+]
+if not targets:
+    raise RuntimeError("No active top-level river/road drawing loop found")
+
+source_lines = s.splitlines(keepends=True)
+replacement_indent = source_lines[targets[0].lineno - 1]
+indent = replacement_indent[:len(replacement_indent)-len(replacement_indent.lstrip())]
+replacement = (
+    indent + "# MB_ROADS_WATER_V5_8_0: one union mask per network; no segment stacking.\\n"
+    + indent + "self.draw_network_layer('river',rect)\\n"
+    + indent + "self.draw_network_layer('road',rect)\\n"
+)
+
+# Replace all matching top-level loops, inserting the union renderer once.
+for node in reversed(targets):
+    a = node.lineno - 1
+    b = node.end_lineno
+    if node is targets[0]:
+        source_lines[a:b] = [replacement]
+    else:
+        del source_lines[a:b]
+s = ''.join(source_lines)
+
+# Old circular-junction/underlay calls are incompatible with the v5.8 union renderer.
+for call in (
+    "        self.draw_road_network_underlay()\\n",
+    "        self.draw_road_junctions()\\n",
+    "        self.draw_junctions()\\n",
+):
+    s = s.replace(call, "")
+
 compile(s, str(p), "exec")
-print("PASS: restored v5.8.0 road/river union renderer without touching other layers")
+p.write_text(s, encoding="utf-8")
+print(f"PASS: restored v5.8.0 road/river union renderer; replaced {len(targets)} old line loops")
