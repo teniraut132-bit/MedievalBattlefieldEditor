@@ -93,7 +93,7 @@ replacement = """        self.draw_road_network_underlay()
                 self.draw_line_obj(o)
         self.draw_road_junctions()
         self.draw_junctions()"""
-if needle in s and "self.draw_road_network_underlay()" not in s[s.index("def draw_all"):s.index("def draw_all")+5000]:
+if needle in s and "self.draw_road_network_underlay()" not in s:
     s = s.replace(needle, replacement, 1)
 
 p.write_text(s, encoding="utf-8")
