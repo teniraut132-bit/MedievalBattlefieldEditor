@@ -44,6 +44,11 @@ jobs:
           pip install -r editor/requirements.txt
           pip install pyinstaller
 
+      - name: Apply cartography and performance patches
+        run: |
+          python tools/patch_5_6_0_cartography.py
+          python tools/optimize_5_9_0.py
+
       - name: Validate source and patch scripts
         shell: pwsh
         run: |
