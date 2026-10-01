@@ -1,2 +1,2 @@
-6.0.1 diagnostics - inspect final Engine 6 render path before repackaging
-Build trigger: 2026-10-01T19:40:00+03:00
+6.0.1 renderer runtime smoke test and blank-map fix validation
+Build trigger: 2026-10-01T20:10:00+03:00
