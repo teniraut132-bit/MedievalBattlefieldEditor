@@ -1,2 +1,2 @@
-6.0.0 ENGINE6 all-in-one migration build
-Build trigger: 2026-10-01T19:10:00+03:00
+6.0.0 ENGINE6 all-in-one migration build - importer syntax fixed
+Build trigger: 2026-10-01T19:25:00+03:00
