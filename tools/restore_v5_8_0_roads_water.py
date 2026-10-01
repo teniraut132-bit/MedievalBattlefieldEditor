@@ -99,56 +99,48 @@ insert_index = draw_line.lineno - 1
 lines.insert(insert_index, NETWORK_METHOD)
 s = ''.join(lines)
 
-# Reparse after insertion and locate the actual drawing function produced by
-# the 5.9 performance patch. We preserve every statement except road/river
-# per-segment loops.
+# Reparse after insertion and replace the per-segment renderer with a no-op.
+# The v5.8.0 appearance is produced by draw_network_layer(), so individual
+# draw_line_obj() calls must not paint additional outlines on top of the union.
 tree = ast.parse(s, filename=str(p))
-app = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "App")
-render_fn = next((n for n in app.body if isinstance(n, ast.FunctionDef) and n.name == "_render_now"), None)
-if render_fn is None:
-    render_fn = next((n for n in app.body if isinstance(n, ast.FunctionDef) and n.name == "render"), None)
-if render_fn is None:
-    raise RuntimeError("Neither _render_now() nor render() found")
-
-def contains_draw_line(node):
-    return any(
-        isinstance(x, ast.Call)
-        and isinstance(x.func, ast.Attribute)
-        and x.func.attr == "draw_line_obj"
-        for x in ast.walk(node)
-    )
-
-all_loops = [
-    n for n in ast.walk(render_fn)
-    if isinstance(n, ast.For) and contains_draw_line(n)
-]
-if not all_loops:
-    raise RuntimeError("No active river/road drawing loop found anywhere in the live renderer")
-
-# Keep only outermost matching loops, so a nested helper loop is not replaced twice.
-targets=[]
-for node in sorted(all_loops,key=lambda n:(n.lineno,-n.end_lineno)):
-    if not any(parent.lineno <= node.lineno and parent.end_lineno >= node.end_lineno for parent in targets):
-        targets.append(node)
+app = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "App"), None)
+if app is None:
+    raise RuntimeError("App class not found after network renderer insertion")
+draw_line = next((n for n in app.body if isinstance(n, ast.FunctionDef) and n.name == "draw_line_obj"), None)
+if draw_line is None:
+    raise RuntimeError("draw_line_obj() not found after network renderer insertion")
 
 source_lines = s.splitlines(keepends=True)
-first = min(targets,key=lambda n:n.lineno)
-replacement_indent = source_lines[first.lineno - 1]
-indent = replacement_indent[:len(replacement_indent)-len(replacement_indent.lstrip())]
-replacement = (
-    indent + "# MB_ROADS_WATER_V5_8_0: one union mask per network; no segment stacking.\n"
-    + indent + "self.draw_network_layer('river',rect)\n"
-    + indent + "self.draw_network_layer('road',rect)\n"
-)
+a = draw_line.lineno - 1
+b = draw_line.end_lineno
+indent = source_lines[a][:len(source_lines[a]) - len(source_lines[a].lstrip())]
+source_lines[a:b] = [indent + "def draw_line_obj(self,o):\n", indent + "    return\n"]
+s = ''.join(source_lines)
 
-for node in sorted(targets,key=lambda n:n.lineno,reverse=True):
-    aa=node.lineno-1
-    bb=node.end_lineno
-    if node is first:
-        source_lines[aa:bb]=[replacement]
-    else:
-        del source_lines[aa:bb]
-s=''.join(source_lines)
+# Inject the v5.8 network layers immediately after the biome layer if available.
+# This preserves all newer biome, boundary, unit and battle rendering code.
+if "self.draw_biome_layer(rect)" in s:
+    anchor = "        self.draw_biome_layer(rect)\n"
+    s = s.replace(
+        anchor,
+        anchor
+        + "        # MB_ROADS_WATER_V5_8_0: unified river/road surfaces.\n"
+        + "        self.draw_network_layer('river',rect)\n"
+        + "        self.draw_network_layer('road',rect)\n",
+        1
+    )
+elif "rect=self._visible_world_rect()" in s:
+    anchor = "        rect=self._visible_world_rect()\n"
+    s = s.replace(
+        anchor,
+        anchor
+        + "        # MB_ROADS_WATER_V5_8_0: unified river/road surfaces.\n"
+        + "        self.draw_network_layer('river',rect)\n"
+        + "        self.draw_network_layer('road',rect)\n",
+        1
+    )
+else:
+    raise RuntimeError("Could not find render viewport anchor for network layers")
 
 # Old circular-junction/underlay calls are incompatible with the v5.8 union renderer.
 for call in (
