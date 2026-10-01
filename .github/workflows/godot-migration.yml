@@ -1,0 +1,42 @@
+name: Godot migration validation
+
+on:
+  push:
+    branches:
+      - engine/godot-6.0-alpha*
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  godot:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Migrate legacy embedded sprites
+        run: |
+          python3 tools/import_legacy_assets_to_godot.py
+
+      - name: Import project resources
+        run: |
+          mkdir -p /root/.local/share/godot/export_templates/4.7.2.stable
+          godot --headless --path godot --editor --quit --verbose
+
+      - name: Parse and validate Godot project
+        run: |
+          godot --headless --path godot --editor --quit
+
+      - name: Export Windows migration build
+        run: |
+          mkdir -p build
+          godot --headless --path godot --export-release "Windows Desktop" ../build/MedievalBattlefieldEditor-Godot.exe
+
+      - name: Package migration build
+        run: |
+          cd build
+          zip -r MedievalBattlefieldEditor-Godot-alpha2-Windows.zip .
