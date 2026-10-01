@@ -1,2 +1,2 @@
-6.0.0 ENGINE6 all-in-one migration build - scaling patch syntax fixed
-Build trigger: 2026-10-01T19:40:00+03:00
+6.0.0 Engine 6 - final validation of optimized v5.8 road/water layer
+Build trigger: 2026-10-01T20:05:00+03:00
