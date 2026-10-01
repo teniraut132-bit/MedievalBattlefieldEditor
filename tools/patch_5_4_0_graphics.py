@@ -43,10 +43,14 @@ replace_once(
     """ttk.Button(vf,text='Очистить природный слой',command=self.clear_nature).pack(fill='x',padx=3,pady=3)
         tf=ttk.LabelFrame(left,text='Текстуры ландшафта');tf.pack(fill='x',pady=4)
         ttk.Label(tf,text='Выбери тип и закрашивай карту кистью').pack(anchor='w',padx=4,pady=(2,3))
-        for i,name in enumerate(TERRAINS):
-            b=ttk.Button(tf,text=name,command=lambda n=name:self.set_terrain(n))
-            b.grid(row=i//2,column=i%2,sticky='ew',padx=2,pady=2)
-        tf.columnconfigure(0,weight=1);tf.columnconfigure(1,weight=1)
+        # Tkinter rule: never mix pack/grid among children of the same parent.
+        # Each row is its own frame; children within it use pack only.
+        terrain_names=list(TERRAINS)
+        for start in range(0,len(terrain_names),2):
+            row=ttk.Frame(tf);row.pack(fill='x',padx=2,pady=1)
+            for name in terrain_names[start:start+2]:
+                b=ttk.Button(row,text=name,command=lambda n=name:self.set_terrain(n))
+                b.pack(side='left',fill='x',expand=True,padx=2,pady=1)
 """,
     "terrain palette UI"
 )
