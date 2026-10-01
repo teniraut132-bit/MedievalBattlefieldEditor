@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, for example 5.0.0'
+        description: 'Release version, for example 5.4.0'
         required: true
-        default: '5.3.4'
+        default: '5.4.0'
 
 permissions:
   contents: write
@@ -50,8 +50,13 @@ jobs:
       - name: Repair editor syntax after patches
         run: python tools/repair_editor_syntax.py
 
-      - name: Validate launcher Python syntax
-        run: python -m py_compile launcher/launcher.py
+      - name: Apply 5.4.0 graphics and terrain painting
+        run: python tools/patch_5_4_0_graphics.py
+
+      - name: Validate editor and launcher Python syntax
+        run: |
+          python -m py_compile editor/Medieval_Battlefield_Editor_v4.py
+          python -m py_compile launcher/launcher.py
 
       - name: Install dependencies
         run: |
@@ -92,7 +97,7 @@ jobs:
       - name: Create launcher release metadata
         shell: pwsh
         run: |
-          $notes = "Релиз $env:RELEASE_VERSION`n`nАвтоматическое обновление редактора."
+          $notes = "Релиз $env:RELEASE_VERSION`n`nТекстурная палитра и кисть ландшафта; улучшенная иллюстрированная подложка."
           $sha = (Get-FileHash 'MedievalBattlefieldEditor-Windows-x64.zip' -Algorithm SHA256).Hash
           $meta = @{ version=$env:RELEASE_VERSION; name='Medieval Battlefield Editor'; notes=$notes; asset_url="https://github.com/${{ github.repository }}/releases/latest/download/MedievalBattlefieldEditor-Windows-x64.zip"; sha256=$sha } | ConvertTo-Json
           $meta | Set-Content 'latest.json' -Encoding utf8
