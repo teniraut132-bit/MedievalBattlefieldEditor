@@ -1,9 +1,13 @@
 from pathlib import Path
-p=Path('editor/Medieval_Battlefield_Editor_v4.py')
-s=p.read_text(encoding='utf-8')
-start=s.index('    def draw_line_obj(self,o):')
-end=s.index('    def draw_obj(self,o):',start)
-new='''    def draw_line_obj(self,o):
+
+p = Path("editor/Medieval_Battlefield_Editor_v4.py")
+s = p.read_text(encoding="utf-8")
+
+# Replace the line renderer and guarantee all road geometry helpers exist.
+start = s.index("    def draw_line_obj(self,o):")
+end = s.index("    def draw_obj(self,o):", start)
+
+new = r'''    def draw_line_obj(self,o):
         p=self.pts(o['points']);wd=o.get('width',25)*self.scale
         if o['kind']=='river':
             self.canvas.create_line(*p,fill='#4b4238',width=max(8,int(wd+32*self.scale)),smooth=True,capstyle='round')
@@ -70,8 +74,7 @@ new='''    def draw_line_obj(self,o):
         roads=[o for o in self.objects if o.get('kind')=='road']
         for i,a in enumerate(roads):
             for b in roads[i+1:]:
-                ra=max(3,a.get('width',25)*self.scale*.50);rb=max(3,b.get('width',25)*self.scale*.50)
-                radius=max(ra,rb)+3*self.scale
+                radius=max(4,(a.get('width',25)+b.get('width',25))*0.55*self.scale)
                 for sa,sb in self.line_segments(a):
                     for sc,sd in self.line_segments(b):
                         q=self.seg_intersection(sa,sb,sc,sd)
@@ -80,16 +83,19 @@ new='''    def draw_line_obj(self,o):
                             self.canvas.create_oval(x-radius,y-radius,x+radius,y+radius,fill='#9b8567',outline='')
 
 '''
-s=s[:start]+new+s[end:]
-needle='        self.draw_junctions()
-        for o in self.objects:'
-replacement='        self.draw_road_network_underlay()
+s = s[:start] + new + s[end:]
+
+# Do not use an embedded newline inside a quoted Python string.
+needle = "        self.draw_junctions()"
+replacement = """        self.draw_road_network_underlay()
         for o in self.objects:
-            if o.get('kind')=='road' and self._bbox_visible(o,rect): self.draw_line_obj(o)
+            if o.get('kind')=='road' and self._bbox_visible(o,rect):
+                self.draw_line_obj(o)
         self.draw_road_junctions()
-        self.draw_junctions()
-        for o in self.objects:'
-if needle in s:
-    s=s.replace(needle,replacement)
-s=s.replace("return {'version':6,","return {'version':7,")
-p.write_text(s,encoding='utf-8')
+        self.draw_junctions()"""
+if needle in s and "self.draw_road_network_underlay()" not in s[s.index("def draw_all"):s.index("def draw_all")+5000]:
+    s = s.replace(needle, replacement, 1)
+
+p.write_text(s, encoding="utf-8")
+compile(s, str(p), "exec")
+print("Applied 5.1.1 road rendering patch and passed syntax check")
