@@ -73,6 +73,20 @@ new_palette = '''    def build_palette(self):
                 b=ttk.Button(row,text=name.replace('_',' ').replace('01','1').replace('02','2').replace('03','3'),
                              command=lambda n=name:self.place_asset(n),**kw)
                 b.pack(side='left',fill='both',expand=True,padx=2,pady=2)
+        # CC0 cartography assets are embedded at build time and appear as normal placeable sprites.
+        cc0_keys=[k for k in ASSETS.keys() if str(k).startswith('cartography_cc0/') and str(k).lower().endswith('.png')]
+        if cc0_keys:
+            ttk.Label(self.palette_frame,text=f'Картография и символы ({len(cc0_keys)})',font=('Arial',10,'bold')).pack(anchor='w',padx=4,pady=(7,2))
+            for start_i in range(0,len(cc0_keys),3):
+                row=ttk.Frame(self.palette_frame);row.pack(fill='x',padx=2)
+                for key in cc0_keys[start_i:start_i+3]:
+                    name=Path(str(key)).stem
+                    im=self.asset_pil(name)
+                    kw={}
+                    if im is not None:
+                        thumb=im.copy();thumb.thumbnail((42,42),Image.Resampling.LANCZOS)
+                        photo=ImageTk.PhotoImage(thumb);self.palette_images.append(photo);kw['image']=photo;kw['compound']='top'
+                    ttk.Button(row,text=name.replace('cartography_','')[:18],command=lambda n=name:self.place_asset(n),**kw).pack(side='left',fill='both',expand=True,padx=2,pady=2)
         custom=[]
         for path in sorted(self.user_asset_dir.iterdir(),key=lambda x:x.name.lower()):
             if path.is_file() and path.suffix.lower() in ('.png','.webp','.jpg','.jpeg'):
