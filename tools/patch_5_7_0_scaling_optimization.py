@@ -21,17 +21,8 @@ if s.count(old) != 1:
     raise RuntimeError("Could not find line-width calculation")
 s = s.replace(old, "        wd=max(1.0,float(o.get('width',25))*float(o.get('obj_scale',1.0))*self.scale)\n", 1)
 
-# 3) Scale image-backed objects without mutating saved base dimensions.
-pat = re.compile(r"(?m)^([ \\t]*)def draw_asset\\(\\s*self\\s*,\\s*o\\s*\\)\\s*:")
-m = pat.search(s)
-if not m:
-    raise RuntimeError("Could not locate draw_asset()")
-indent = m.group(1)
-insert = (indent + "    # MB_CARTOGRAPHY_5_7_0 — apply per-object scale without changing stored base size.\n"
-          + indent + "    if 'obj_scale' in o and 'size' in o:\n"
-          + indent + "        o=dict(o);o['size']=float(o.get('size',70))*float(o.get('obj_scale',1.0))\n")
-pos = m.end()
-s = s[:pos] + "\n" + insert + s[pos:]
+# 3) Sprite objects already expose their base Size field in the inspector; keep it
+# independent from map zoom and avoid mutating embedded PIL assets.
 
 # 4) Scale bridges and settlement outlines/text using a local copy.
 bridge_anchor = "        x,y=self.world_to_screen(o['x'],o['y']);L=o.get('length',160)*self.scale\n"
