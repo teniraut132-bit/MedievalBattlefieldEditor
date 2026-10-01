@@ -1,2 +1,2 @@
-5.9.4 — continuous biome brush and Ctrl-drag object rotation
-Build trigger: 2026-10-01T15:25:00+03:00
+5.9.5 — stylized visible map boundary; existing roads, rivers, biomes and object controls preserved
+Build trigger: 2026-10-01T15:35:00+03:00
