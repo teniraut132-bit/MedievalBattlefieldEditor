@@ -11,7 +11,7 @@ on:
       version:
         description: 'Release version, for example 5.4.0'
         required: true
-        default: '5.7.0'
+        default: '5.8.0'
 
 permissions:
   contents: write
@@ -61,6 +61,9 @@ jobs:
 
       - name: Apply 5.7.0 object scaling and rendering optimization
         run: python tools/patch_5_7_0_scaling_optimization.py
+
+      - name: Apply 5.8.0 unified road and river network renderer
+        run: python tools/patch_5_8_0_network_union.py
 
       - name: Validate editor and launcher Python syntax
         run: |
