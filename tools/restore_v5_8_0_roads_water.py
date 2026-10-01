@@ -152,4 +152,4 @@ for call in (
 
 compile(s, str(p), "exec")
 p.write_text(s, encoding="utf-8")
-print(f"PASS: restored v5.8.0 road/river union renderer; replaced {len(targets)} old line loops")
+print("PASS: restored v5.8.0 road/river union renderer without per-segment stacking")
