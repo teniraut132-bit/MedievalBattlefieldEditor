@@ -1,2 +1,2 @@
-5.9.6 — persistent custom sprite library, import/export sprite packs, compact tabbed tools, scrollable asset palette, battle results journal and expanded combat calculation. Roads and rivers intentionally unchanged.
-Build trigger: 2026-10-01T16:23:00+03:00
+5.9.6 — persistent sprite library, shared sprite packs, compact tabbed tools, scrollable palette, battle result journal and combat calculation. Roads and rivers unchanged.
+Build trigger: 2026-10-01T16:31:00+03:00
