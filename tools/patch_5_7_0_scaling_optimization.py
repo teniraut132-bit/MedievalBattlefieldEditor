@@ -22,7 +22,7 @@ if s.count(old) != 1:
 s = s.replace(old, "        wd=max(1.0,float(o.get('width',25))*float(o.get('obj_scale',1.0))*self.scale)\n", 1)
 
 # 3) Scale image-backed objects without mutating saved base dimensions.
-pat = re.compile(r"(?m)^([ \\t]*)def draw_asset\\(self,o\\):\\s*$")
+pat = re.compile(r"(?m)^([ \\t]*)def draw_asset\\(\\s*self\\s*,\\s*o\\s*\\)\\s*:")
 m = pat.search(s)
 if not m:
     raise RuntimeError("Could not locate draw_asset()")
