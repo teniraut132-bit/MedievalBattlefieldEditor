@@ -1,2 +1,2 @@
-5.9.8 final - exact v5.8.0 road/river union renderer, newer features preserved
-Build trigger: 2026-10-01T17:45:00+03:00
+5.9.8 final - roads/rivers restored to v5.8.0 network-union renderer, all newer features preserved
+Build trigger: 2026-10-01T17:55:00+03:00
