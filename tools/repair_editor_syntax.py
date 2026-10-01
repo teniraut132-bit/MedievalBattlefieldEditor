@@ -234,6 +234,91 @@ palette_body = [
 ]
 s = s[:m.start()] + "\n".join(base + line for line in palette_body) + "\n" + s[m.end():]
 
+
+# 5.2.7: normalize embedded sprite names and render line networks by layers.
+# This makes branches merge without circular junction marks or dark underlay
+# dots, and makes asset lookup independent of path/suffix variations.
+render_re = re.compile(r"(?ms)^[ \\t]*def render\\(self\\):\\r?\\n.*?(?=^[ \\t]*def pts\\(self,p\\):)")
+m = render_re.search(s)
+if not m:
+    raise RuntimeError("Could not locate render() for layered network rendering")
+base_m = re.search(r"(?m)^([ \\t]*)def pts\\(self,p\\):", s[m.start():])
+base = base_m.group(1)
+render_body = [
+    "def render(self):",
+    "    self._render_revision += 1",
+    "    self.canvas.delete('all')",
+    "    w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height())",
+    "    self.canvas.create_rectangle(0,0,w,h,fill='#b8a97c',outline='',tags='background')",
+    "    rect=self._visible_world_rect()",
+    "    rivers=[o for o in self.objects if o.get('kind')=='river' and self._bbox_visible(o,rect)]",
+    "    roads=[o for o in self.objects if o.get('kind')=='road' and self._bbox_visible(o,rect)]",
+    "    # Draw each network as global layers: all outlines, then all surfaces,",
+    "    # then all fine details. Branches merge as continuous shapes, not dots.",
+    "    for layer in ('outline','surface','detail'):",
+    "        for o in rivers:self.draw_line_obj(o,layer)",
+    "    for layer in ('outline','surface','detail'):",
+    "        for o in roads:self.draw_line_obj(o,layer)",
+    "    for o in self.objects:",
+    "        if o.get('kind') not in ('river','road') and self._bbox_visible(o,rect):self.draw_obj(o)",
+    "    for u in self.units:",
+    "        if rect[0]-100 <= u['x'] <= rect[2]+100 and rect[1]-100 <= u['y'] <= rect[3]+100:self.draw_unit(u)",
+    "    if self.selected:self.draw_selection(self.selected[1])",
+]
+s=s[:m.start()]+"\\n".join(base+line for line in render_body)+"\\n"+s[m.end():]
+
+line_re = re.compile(r"(?ms)^[ \\t]*def draw_line_obj\\(self,o.*?\\):\\r?\\n.*?(?=^[ \\t]*def line_segments\\(self,o\\):)")
+m=line_re.search(s)
+if not m: raise RuntimeError("Could not locate draw_line_obj()")
+base=re.match(r"^([ \\t]*)",m.group(0)).group(1)
+line_body=[
+"def draw_line_obj(self,o,layer='all'):",
+"    p=self.pts(o.get('points',[]))",
+"    if len(p)<4:return",
+"    wd=max(1,o.get('width',25)*self.scale)",
+"    layers=('outline','surface','detail') if layer=='all' else (layer,)",
+"    if o.get('kind')=='river':",
+"        specs={'outline':('#4b4238',wd+32*self.scale),'surface':('#4fa8a2',wd),'detail':('#8ccbc1',max(1,3*self.scale))}",
+"        for part in layers:",
+"            color,width=specs[part]",
+"            self.canvas.create_line(*p,fill=color,width=max(1,int(width)),smooth=True,capstyle='round',joinstyle='round')",
+"        return",
+"    rt=o.get('road_type','Просёлочная')",
+"    colors={'Просёлочная':('#624b37','#b79a70','#dbc79f'),'Мощенная':('#51483e','#756b5d','#b9ad96'),'Брусчаточная':('#4a3b2d','#8b7b67','#c5b69a')}",
+"    edge,surf,detail=colors.get(rt,colors['Просёлочная'])",
+"    specs={'outline':(edge,wd+12*self.scale),'surface':(surf,wd),'detail':(detail,max(1,wd*.13))}",
+"    for part in layers:",
+"        color,width=specs[part]",
+"        dash=(2,5) if part=='detail' and rt=='Брусчаточная' else (7,6) if part=='detail' and rt=='Мощенная' else ()",
+"        self.canvas.create_line(*p,fill=color,width=max(1,int(width)),smooth=True,capstyle='round',joinstyle='round',dash=dash)",
+]
+s=s[:m.start()]+"\\n".join(base+line for line in line_body)+"\\n"+s[m.end():]
+
+asset_re = re.compile(r"(?ms)^[ \\t]*def asset_pil\\(self,name\\):\\r?\\n.*?(?=^[ \\t]*def place_asset\\(self,name\\):)")
+m=asset_re.search(s)
+if not m: raise RuntimeError("Could not locate asset_pil() for robust lookup")
+base=re.match(r"^([ \\t]*)",m.group(0)).group(1)
+asset_body=[
+"def asset_pil(self,name):",
+"    # Normalize both bare asset names and paths such as terrain/tree_01.png.",
+"    normalized=Path(str(name)).stem.lower()",
+"    if normalized in self.asset_pil_cache:return self.asset_pil_cache[normalized]",
+"    key=next((k for k in ASSETS if Path(k).stem.lower()==normalized),None)",
+"    if not key:return None",
+"    try:",
+"        raw=__import__('base64').b64decode(ASSETS[key],validate=True)",
+"        im=Image.open(io.BytesIO(raw)).convert('RGBA')",
+"        im.load()",
+"        if im.width<2 or im.height<2:return None",
+"        self.asset_pil_cache[normalized]=im",
+"        return im",
+"    except Exception as exc:",
+"        if not hasattr(self,'asset_load_errors'):self.asset_load_errors={}",
+"        self.asset_load_errors[normalized]=repr(exc)",
+"        return None",
+]
+s=s[:m.start()]+"\\n".join(base+line for line in asset_body)+"\\n"+s[m.end():]
+
 tree=ast.parse(s,filename=str(p))
 app=next((n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='App'),None)
 if app is None:raise RuntimeError("App class not found")
