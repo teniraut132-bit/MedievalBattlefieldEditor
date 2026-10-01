@@ -108,7 +108,7 @@ if old_bbox_kind not in s:
     raise RuntimeError("terrain bounding-box insertion point missing")
 s = s.replace(old_bbox_kind, "        if o.get('kind') in ('river','road','terrain'):\n", 1)
 
-insert_before = "    def draw_line_obj(self,o):\n"
+insert_before = "    def draw_obj(self,o):\n"
 terrain_methods = """    def _draw_ground_texture(self,w,h):
         # A reusable illustrated parchment/grass tile. The tile remains aligned
         # to world coordinates while the camera pans.
@@ -172,7 +172,7 @@ terrain_methods = """    def _draw_ground_texture(self,w,h):
 
 """
 if s.count(insert_before) != 1:
-    raise RuntimeError("draw_line_obj insertion point missing")
+    raise RuntimeError("draw_obj insertion point missing")
 s=s.replace(insert_before,terrain_methods+insert_before,1)
 
 replace_once(
