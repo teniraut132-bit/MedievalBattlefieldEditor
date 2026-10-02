@@ -53,6 +53,12 @@ jobs:
         working-directory: editor
         run: pyinstaller --noconfirm --clean --onedir --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
 
+      - name: Package launcher onedir
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'dist/MedievalBattlefieldLauncher/*' -DestinationPath 'MedievalBattlefieldLauncher-Windows-x64.zip' -Force
+          (Get-FileHash 'MedievalBattlefieldLauncher-Windows-x64.zip' -Algorithm SHA256).Hash | Set-Content 'MedievalBattlefieldLauncher-Windows-x64.zip.sha256' -Encoding ascii
+
       - name: Determine release version
         shell: pwsh
         run: |
@@ -86,4 +92,5 @@ jobs:
           files: |
             MedievalBattlefieldEditor-Windows-x64.zip
             MedievalBattlefieldEditor-Windows-x64.zip.sha256
-            dist/MedievalBattlefieldLauncher/
+            MedievalBattlefieldLauncher-Windows-x64.zip
+            MedievalBattlefieldLauncher-Windows-x64.zip.sha256
