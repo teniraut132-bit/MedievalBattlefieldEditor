@@ -44,6 +44,9 @@ jobs:
           pip install -r editor/requirements.txt
           pip install pyinstaller
 
+      - name: Audit graphics core and bundled assets
+        run: python tools/audit_graphics_core.py
+
       - name: Build editor
         working-directory: editor
         run: pyinstaller --noconfirm --clean --onefile --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
