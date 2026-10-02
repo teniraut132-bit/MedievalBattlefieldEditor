@@ -33,12 +33,28 @@ def _urlopen_retry(req,timeout):
     raise last
 
 def get(url,timeout=10):
-    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.0','Accept':'application/vnd.github+json','Connection':'close'})
+    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.1','Accept':'application/vnd.github+json','Connection':'close'})
     with _urlopen_retry(r,timeout) as x:return json.loads(x.read().decode('utf-8-sig'))
 
 def get_bytes(url,timeout=90):
-    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.0','Accept':'application/octet-stream','Connection':'close'})
+    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.1','Accept':'application/octet-stream','Connection':'close'})
     with _urlopen_retry(r,timeout) as x:return x.read()
+
+def download_asset(url,path,version):
+    r=urllib.request.Request(url,headers={'User-Agent':'MedievalBattlefieldLauncher/6.1.1','Accept':'application/octet-stream','Connection':'close'})
+    with _urlopen_retry(r,120) as response, open(path,'wb') as output:
+        total=int(response.headers.get('Content-Length') or 0)
+        received=0
+        while True:
+            block=response.read(1024*1024)
+            if not block:break
+            output.write(block)
+            received+=len(block)
+            if total:
+                pct=min(100,int(received*100/total))
+                ui_status(f'Скачивание версии {version}… {pct}% ({received//1048576} / {max(1,total//1048576)} МБ)')
+            else:
+                ui_status(f'Скачивание версии {version}… {received//1048576} МБ')
 def sha(p):
     h=hashlib.sha256()
     with open(p,'rb') as f:
@@ -57,6 +73,8 @@ def ui_status(text):
     if 'root' in globals() and root.winfo_exists():root.after(0,lambda: status.set(text) if root.winfo_exists() else None)
 def ui_error(title,text):
     if 'root' in globals() and root.winfo_exists():root.after(0,lambda: messagebox.showerror(title,text) if root.winfo_exists() else None)
+update_in_progress=False
+
 def update():
     tmp=None
     try:
@@ -70,7 +88,7 @@ def update():
         if not asset:raise RuntimeError('В последнем GitHub Release отсутствует '+cfg['asset_name'])
         tmp=Path(tempfile.mkdtemp(prefix='mb-update-')); z=tmp/'release.zip'
         ui_status(f'Скачивание версии {tag}…')
-        with open(z,'wb') as f:f.write(get_bytes(asset['browser_download_url'],90))
+        download_asset(asset['browser_download_url'],z,tag)
         chk=next((a for a in rel.get('assets',[]) if a['name']==cfg['asset_name']+'.sha256'),None)
         expected=None
         if chk:
@@ -112,7 +130,28 @@ def update():
         ui_error('Обновление',str(e))
     finally:
         if tmp:shutil.rmtree(tmp,ignore_errors=True)
-def threaded():threading.Thread(target=update,daemon=True,name='UpdateCheck').start()
+        if 'root' in globals():
+            try:
+                if root.winfo_exists():root.after(0,update_finished)
+            except Exception:pass
+
+def update_finished():
+    global update_in_progress
+    update_in_progress=False
+    try:
+        if root.winfo_exists():
+            launch_btn.configure(state='normal')
+            update_btn.configure(state='normal')
+    except Exception:pass
+
+def threaded():
+    global update_in_progress
+    if update_in_progress:return
+    update_in_progress=True
+    launch_btn.configure(state='disabled')
+    update_btn.configure(state='disabled')
+    ui_status('Подготовка проверки обновлений…')
+    threading.Thread(target=update,daemon=True,name='UpdateCheck').start()
 def launch():
     e=findexe(INSTALL)
     if not e:
@@ -131,8 +170,10 @@ tk.Label(root,text='MEDIEVAL BATTLEFIELD EDITOR',bg='#11100d',fg='#d6b45e',font=
 vervar=tk.StringVar(value='Версия: '+ver());tk.Label(root,textvariable=vervar,bg='#11100d',fg='#dfcea0',font=('Georgia',11)).pack()
 frame=tk.Frame(root,bg='#1a1712',highlightbackground='#66502b',highlightthickness=2);frame.pack(fill='both',expand=True,padx=30,pady=25)
 status=tk.StringVar(value='Готово.');tk.Label(frame,textvariable=status,bg='#1a1712',fg='#d8c89f',font=('Georgia',12)).pack(pady=30)
-tk.Button(frame,text='ЗАПУСТИТЬ РЕДАКТОР',command=launch,bg='#66251d',fg='#f2d8a2',font=('Georgia',14,'bold'),relief='flat',padx=30,pady=12).pack(pady=10)
-tk.Button(frame,text='ПРОВЕРИТЬ ОБНОВЛЕНИЯ',command=threaded,bg='#30271c',fg='#e2cd96',font=('Georgia',11,'bold'),relief='flat',padx=25,pady=9).pack(pady=8)
+launch_btn=tk.Button(frame,text='ЗАПУСТИТЬ РЕДАКТОР',command=launch,bg='#66251d',fg='#f2d8a2',font=('Georgia',14,'bold'),relief='flat',padx=30,pady=12)
+launch_btn.pack(pady=10)
+update_btn=tk.Button(frame,text='ПРОВЕРИТЬ ОБНОВЛЕНИЯ',command=threaded,bg='#30271c',fg='#e2cd96',font=('Georgia',11,'bold'),relief='flat',padx=25,pady=9)
+update_btn.pack(pady=8)
 tk.Button(frame,text='Настройки GitHub',command=settings,bg='#30271c',fg='#e2cd96',relief='flat').pack(pady=8)
 # Network checks never block the UI thread; use GitHub's single latest-release endpoint.
 if cfg.get('auto_check',True):root.after(250,threaded)
