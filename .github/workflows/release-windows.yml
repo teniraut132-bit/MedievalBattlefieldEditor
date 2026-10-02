@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, for example 5.9.6'
+        description: 'Release version, for example 5.9.10'
         required: true
-        default: '5.9.8'
+        default: '5.9.10'
 
 permissions:
   contents: write
@@ -62,9 +62,22 @@ jobs:
           Get-ChildItem tools -Filter '*.py' | ForEach-Object { python -m py_compile $_.FullName }
           if ($LASTEXITCODE -ne 0) { throw 'Python syntax validation failed' }
 
-      - name: Build editor (onedir for faster startup)
+      - name: Verify Pillow Tk bridge before packaging
+        run: python -c "from PIL import Image, ImageTk, _imagingtk; print('Pillow ImageTk bridge OK:', Image.__version__)"
+
+      - name: Build editor with complete Pillow/Tk image modules
         working-directory: editor
-        run: pyinstaller --noconfirm --clean --onedir --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
+        run: pyinstaller --noconfirm --clean --onedir --windowed --collect-all PIL --hidden-import=PIL.ImageTk --hidden-import=PIL._imagingtk --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
+
+      - name: Verify packaged Pillow Tk bridge
+        shell: pwsh
+        run: |
+          $bundle = 'editor/dist/MedievalBattlefieldEditor'
+          $bridge = Get-ChildItem $bundle -Recurse -File -Filter '*imagingtk*.pyd' -ErrorAction SilentlyContinue
+          if (-not $bridge) { throw 'Pillow _imagingtk binary is missing from the packaged editor.' }
+          $imageTk = Get-ChildItem $bundle -Recurse -File -Filter 'ImageTk.py' -ErrorAction SilentlyContinue
+          if (-not $imageTk) { throw 'Pillow ImageTk.py is missing from the packaged editor.' }
+          Write-Host "Pillow bridge packaged: $($bridge.FullName)"
 
       - name: Determine release version
         shell: pwsh
