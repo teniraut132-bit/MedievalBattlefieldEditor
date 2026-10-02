@@ -77,6 +77,11 @@ jobs:
           if (-not $bridge) { throw 'Pillow _imagingtk binary is missing from the packaged editor.' }
           $imageTk = Get-ChildItem $bundle -Recurse -File -Filter 'ImageTk.py' -ErrorAction SilentlyContinue
           if (-not $imageTk) { throw 'Pillow ImageTk.py is missing from the packaged editor.' }
+          $pilDir = Get-ChildItem $bundle -Recurse -Directory | Where-Object { $_.Name -eq 'PIL' } | Select-Object -First 1
+          if (-not $pilDir) { throw 'PIL package directory is missing from the packaged editor.' }
+          $env:PYTHONPATH = $pilDir.Parent.FullName + ';' + $env:PYTHONPATH
+          python -c "from PIL import Image, ImageTk, _imagingtk; print('Packaged ImageTk bridge import OK:', Image.__version__)"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged Pillow ImageTk bridge failed to import.' }
           Write-Host "Pillow bridge packaged: $($bridge.FullName)"
 
       - name: Determine release version
