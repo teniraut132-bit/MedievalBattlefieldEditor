@@ -68,7 +68,82 @@ jobs:
 
       - name: Build Engine 6 editor (onedir for fast startup)
         working-directory: editor
-        run: pyinstaller --noconfirm --clean --onedir --windowed --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
+        run: pyinstaller --noconfirm --clean --onedir --windowed --collect-all PIL --hidden-import=PIL.ImageTk --hidden-import=PIL._imagingtk --name MedievalBattlefieldEditor Medieval_Battlefield_Editor_v4.py
+
+      - name: Verify Pillow Tk image support included in frozen build
+        shell: pwsh
+        run: |
+          $pillow = Get-ChildItem 'editor/dist/MedievalBattlefieldEditor/_internal/PIL' -ErrorAction SilentlyContinue
+          if (-not $pillow) { $pillow = Get-ChildItem 'editor/dist/MedievalBattlefieldEditor/PIL' -ErrorAction SilentlyContinue }
+          if (-not $pillow) { throw 'PyInstaller package does not contain the PIL runtime files.' }
+          $tkExt = Get-ChildItem 'editor/dist/MedievalBattlefieldEditor' -Recurse -File | Where-Object { $_.Name -match '^_imagingtk.*\.pyd
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}'.TrimStart('v')
+          } elseif ('${{ github.ref_type }}' -eq 'branch' -and '${{ github.ref_name }}'.StartsWith('release/')) {
+            $version = '${{ github.ref_name }}'.Substring(8)
+          } else {
+            $version = '${{ inputs.version }}'
+          }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+          $manifest = @{ version=$version; name='Medieval Battlefield Editor' } | ConvertTo-Json
+          $manifest | Set-Content 'editor/dist/version.json' -Encoding utf8
+
+      - name: Package editor
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'editor/dist/*' -DestinationPath 'MedievalBattlefieldEditor-Windows-x64.zip' -Force
+          (Get-FileHash 'MedievalBattlefieldEditor-Windows-x64.zip' -Algorithm SHA256).Hash | Set-Content 'MedievalBattlefieldEditor-Windows-x64.zip.sha256' -Encoding ascii
+
+      - name: Build launcher (compatibility EXE)
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name MedievalBattlefieldLauncher launcher/launcher.py
+
+      - name: Build launcher (fast onedir package)
+        run: pyinstaller --noconfirm --clean --onedir --windowed --name MedievalBattlefieldLauncher --distpath launcher_dist launcher/launcher.py
+
+      - name: Package fast launcher
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'launcher_dist/MedievalBattlefieldLauncher/*' -DestinationPath 'MedievalBattlefieldLauncher-Windows-x64.zip' -Force
+          (Get-FileHash 'MedievalBattlefieldLauncher-Windows-x64.zip' -Algorithm SHA256).Hash | Set-Content 'MedievalBattlefieldLauncher-Windows-x64.zip.sha256' -Encoding ascii
+
+      - name: Package complete Engine 6 bundle
+        shell: pwsh
+        run: |
+          Remove-Item 'complete-bundle' -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path 'complete-bundle/editor' | Out-Null
+          Copy-Item 'editor/dist/*' 'complete-bundle/editor' -Recurse -Force
+          Copy-Item 'dist/MedievalBattlefieldLauncher.exe' 'complete-bundle/MedievalBattlefieldLauncher.exe' -Force
+          Copy-Item 'launcher/launcher_config.json' 'complete-bundle/launcher_config.json' -Force
+          @'
+          MEDIEVAL BATTLEFIELD EDITOR — ENGINE 6
+          =====================================
+
+          Extract this archive to a normal writable folder, then start MedievalBattlefieldLauncher.exe.
+          The editor and launcher are already included in this bundle.
+          Roads and water use the established v5.8 renderer.
+          '@ | Set-Content 'complete-bundle/README-FIRST.txt' -Encoding utf8
+          Compress-Archive -Path 'complete-bundle/*' -DestinationPath 'MedievalBattlefield-Complete-Windows-x64.zip' -Force
+          (Get-FileHash 'MedievalBattlefield-Complete-Windows-x64.zip' -Algorithm SHA256).Hash | Set-Content 'MedievalBattlefield-Complete-Windows-x64.zip.sha256' -Encoding ascii
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RELEASE_VERSION }}
+          name: Medieval Battlefield Editor v${{ env.RELEASE_VERSION }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            MedievalBattlefieldEditor-Windows-x64.zip
+            MedievalBattlefieldEditor-Windows-x64.zip.sha256
+            MedievalBattlefield-Complete-Windows-x64.zip
+            MedievalBattlefield-Complete-Windows-x64.zip.sha256
+            dist/MedievalBattlefieldLauncher.exe
+            MedievalBattlefieldLauncher-Windows-x64.zip
+            MedievalBattlefieldLauncher-Windows-x64.zip.sha256
+ }
+          if (-not $tkExt) { throw 'Pillow _imagingtk extension was not packaged; refusing to publish a broken editor.' }
 
       - name: Determine release version
         shell: pwsh
