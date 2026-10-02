@@ -1,0 +1,2 @@
+5.9.11 graphics-core audit
+Preserve road and river rendering from the current release; audit graphics resources and Python source integrity before packaging.
